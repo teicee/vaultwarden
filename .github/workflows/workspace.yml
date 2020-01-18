@@ -19,7 +19,7 @@ jobs:
           - x86_64-unknown-linux-gnu
           # - x86_64-unknown-linux-musl
           - x86_64-apple-darwin
-          # - x86_64-pc-windows-msvc
+          - x86_64-pc-windows-msvc
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
@@ -30,9 +30,9 @@ jobs:
           - target: x86_64-apple-darwin
             os: macOS-latest
             ext:
-          # - target: x86_64-pc-windows-msvc
-          #   os: windows-latest
-          #   ext: .exe
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            ext: .exe
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v1
@@ -78,18 +78,19 @@ jobs:
 
     # Install dependencies
     - name: Install dependencies macOS
-      run: brew update; brew install openssl sqlite libpq mysql
+      run: brew update; brew install openssl libpq mysql
       if: matrix.os == 'macOS-latest'
 
     - name: Install dependencies Ubuntu
-      run: sudo apt-get update && sudo apt-get install --no-install-recommends openssl sqlite libpq-dev libmysql++-dev
+      run: sudo apt-get update && sudo apt-get install --no-install-recommends openssl libpq-dev libmysql++-dev
       if: matrix.os == 'ubuntu-latest'
 
     - name: Install dependencies Windows
-      run: vcpkg integrate install; vcpkg install sqlite3:x64-windows openssl:x64-windows libpq:x64-windows libmysql:x64-windows
+      run: vcpkg integrate install; vcpkg install openssl:x64-windows libpq:x64-windows libmysql:x64-windows
       if: matrix.os == 'windows-latest'
       env:
         VCPKG_ROOT: 'C:\vcpkg'
+        VCPKG_DEFAULT_TRIPLET: 'x64-windows-static'
     # End Install dependencies
 
     # Install rust nightly toolchain
@@ -112,7 +113,7 @@ jobs:
     - name: Install latest nightly
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly
+        toolchain: nightly-2019-12-19
         override: true
         profile: minimal
         target: ${{ matrix.target }}
@@ -124,6 +125,7 @@ jobs:
       env:
         RUSTFLAGS: -Ctarget-feature=+crt-static
         VCPKG_ROOT: 'C:\vcpkg'
+        VCPKG_DEFAULT_TRIPLET: 'x64-windows-static'
 
     - name: Build macOS / Ubuntu
       if: matrix.os == 'macOS-latest' || matrix.os == 'ubuntu-latest'

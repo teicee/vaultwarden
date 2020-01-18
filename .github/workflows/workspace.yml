@@ -86,7 +86,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
 
     - name: Install dependencies Windows
-      run: vcpkg integrate install; vcpkg install openssl:x64-windows libpq:x64-windows libmysql:x64-windows
+      run: vcpkg integrate install; vcpkg install openssl libpq libmysql
       if: matrix.os == 'windows-latest'
       env:
         VCPKG_ROOT: 'C:\vcpkg'

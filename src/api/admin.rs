@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::process::Command;
 
 use rocket::{
-    http::{Cookie, Cookies, SameSite},
+    http::{Cookie, CookieJar, SameSite},
     request::{self, FlashMessage, Form, FromRequest, Outcome, Request},
     response::{content::Html, Flash, Redirect},
     Route,
@@ -72,10 +72,11 @@ fn admin_path() -> String {
 
 struct Referer(Option<String>);
 
+#[rocket::async_trait]
 impl<'a, 'r> FromRequest<'a, 'r> for Referer {
     type Error = ();
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+    async fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
         Outcome::Success(Referer(request.headers().get_one("Referer").map(str::to_string)))
     }
 }
@@ -120,7 +121,7 @@ struct LoginForm {
 #[post("/", data = "<data>")]
 fn post_admin_login(
     data: Form<LoginForm>,
-    mut cookies: Cookies,
+    cookies: &CookieJar,
     ip: ClientIp,
     referer: Referer,
 ) -> Result<Redirect, Flash<Redirect>> {
@@ -275,7 +276,7 @@ fn test_smtp(data: Json<InviteData>, _token: AdminToken) -> EmptyResult {
 }
 
 #[get("/logout")]
-fn logout(mut cookies: Cookies, referer: Referer) -> Result<Redirect, ()> {
+fn logout(cookies: &CookieJar, referer: Referer) -> Result<Redirect, ()> {
     cookies.remove(Cookie::named(COOKIE_NAME));
     Ok(Redirect::to(admin_url(referer)))
 }
@@ -457,21 +458,23 @@ fn backup_db(_token: AdminToken) -> EmptyResult {
 
 pub struct AdminToken {}
 
+#[rocket::async_trait]
 impl<'a, 'r> FromRequest<'a, 'r> for AdminToken {
     type Error = &'static str;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+    async fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
         if CONFIG.disable_admin_token() {
             Outcome::Success(AdminToken {})
         } else {
-            let mut cookies = request.cookies();
+            let cookies = request.cookies();
 
-            let access_token = match cookies.get(COOKIE_NAME) {
-                Some(cookie) => cookie.value(),
+            let cookie = cookies.get(COOKIE_NAME);
+            let access_token = match cookie {
+                Some(ref cookie) => cookie.value(),
                 None => return Outcome::Forward(()), // If there is no cookie, redirect to login
             };
 
-            let ip = match request.guard::<ClientIp>() {
+            let ip = match ClientIp::from_request(&request).await {
                 Outcome::Success(ip) => ip.ip,
                 _ => err_handler!("Error getting Client IP"),
             };

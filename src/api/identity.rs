@@ -1,8 +1,10 @@
 use chrono::Utc;
+use jsonwebtoken::DecodingKey;
 use num_traits::FromPrimitive;
 use rocket::serde::json::Json;
 use rocket::{
     form::{Form, FromForm},
+    response::Redirect,
     Route,
 };
 use serde_json::Value;
@@ -21,7 +23,7 @@ use crate::{
 };
 
 pub fn routes() -> Vec<Route> {
-    routes![login, prelogin, identity_register]
+    routes![login, prelogin, identity_register, prevalidate, authorize, oidcsignin]
 }
 
 #[post("/connect/token", data = "<data>")]
@@ -53,6 +55,11 @@ async fn login(data: Form<ConnectData>, client_header: ClientHeaders, mut conn: 
             _check_is_some(&data.scope, "scope cannot be blank")?;
 
             _api_key_login(data, &mut user_uuid, &mut conn, &ip).await
+        }
+        "authorization_code" => {
+            _check_is_some(&data.code, "code cannot be blank")?;
+            _check_is_some(&data.device_identifier, "device identifier cannot be blank")?;
+            _authorization_login(data, &mut user_uuid, &mut conn, &ip).await
         }
         t => err!("Invalid type", t),
     };
@@ -103,13 +110,118 @@ async fn _refresh_login(data: ConnectData, conn: &mut DbConn) -> JsonResult {
         "refresh_token": device.refresh_token,
         "Key": user.akey,
         "PrivateKey": user.private_key,
-
         "Kdf": user.client_kdf_type,
         "KdfIterations": user.client_kdf_iter,
-        "ResetMasterPassword": false, // TODO: according to official server seems something like: user.password_hash.is_empty(), but would need testing
+        "ResetMasterPassword": user.password_hash.is_empty(),
         "scope": scope,
         "unofficialServer": true,
     })))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TokenPayload {
+    exp: i64,
+    email: String,
+    nonce: String,
+}
+
+async fn _authorization_login(data: ConnectData, user_uuid: &mut Option<String>,conn: &mut DbConn, ip: &ClientIp) -> JsonResult {
+    let code = data.code.as_ref().unwrap();
+    
+    //identifer was removed from the login process so the below function returns the first organization always.
+    let organization = Organization::find_by_identifier("vaultwarden", conn).await.unwrap();
+
+    let (refresh_token, id_token) = match get_auth_code_access_token(code).await {
+        Ok((refresh_token, id_token)) => (refresh_token, id_token),
+        Err(err) => err!(err),
+    };
+
+    let mut validation = jsonwebtoken::Validation::default();
+    validation.insecure_disable_signature_validation();
+
+    let token = jsonwebtoken::decode::<TokenPayload>(id_token.as_str(), &DecodingKey::from_secret(&[]), &validation)
+        .unwrap()
+        .claims;
+
+    // let expiry = token.exp;
+    let nonce = token.nonce;
+    let mut new_user = false;
+
+    match SsoNonce::find_by_org_and_nonce(&organization.uuid, &nonce, conn).await {
+        Some(sso_nonce) => {
+            match sso_nonce.delete(&conn).await {
+                Ok(_) => {
+                    // let expiry = token.exp;
+                    let user_email = token.email;
+                    let now = Utc::now().naive_utc();
+
+                    let mut user = match User::find_by_mail(&user_email, conn).await {
+                        Some(user) => user,
+                        None => {
+                            new_user = true;
+                            User::new(user_email.clone())
+                        }
+                    };
+
+                    if new_user {
+                        user.save(conn).await?;
+                    }
+
+                    // Set the user_uuid here to be passed back used for event logging.
+                    *user_uuid = Some(user.uuid.clone());
+                
+                    let (mut device, new_device) = get_device(&data, conn, &user).await;
+
+                    let twofactor_token = twofactor_auth(&user.uuid, &data, &mut device, ip, conn).await?;
+
+                    if CONFIG.mail_enabled() && new_device {
+                        if let Err(e) =
+                            mail::send_new_device_logged_in(&user.email, &ip.ip.to_string(), &now, &device.name).await
+                        {
+                            error!("Error sending new device email: {:#?}", e);
+
+                            if CONFIG.require_device_email() {
+                                err!("Could not send login notification email. Please contact your administrator.")
+                            }
+                        }
+                    }
+
+                    device.refresh_token = refresh_token.clone();
+                    device.save(conn).await?;
+
+                    let scope_vec = vec!["api".into(), "offline_access".into()];
+                    let orgs = UserOrganization::find_confirmed_by_user(&user.uuid, conn).await;
+                    let (access_token_new, expires_in) = device.refresh_tokens(&user, orgs, scope_vec);
+                    device.save(conn).await?;
+
+                    let mut result = json!({
+                        "access_token": access_token_new,
+                        "expires_in": expires_in,
+                        "token_type": "Bearer",
+                        "refresh_token": refresh_token,
+                        "Key": user.akey,
+                        "PrivateKey": user.private_key,
+                        "Kdf": user.client_kdf_type,
+                        "KdfIterations": user.client_kdf_iter,
+                        "ResetMasterPassword": user.password_hash.is_empty(),
+                        "scope": "api offline_access",
+                        "unofficialServer": true,
+                    });
+
+                    if let Some(token) = twofactor_token {
+                        result["TwoFactorToken"] = Value::String(token);
+                    }
+
+                    info!("User {} logged in successfully. IP: {}", user.email, ip.ip);
+                    Ok(Json(result))
+                }
+                Err(_) => err!("Failed to delete nonce"),
+            }
+        }
+        None => {
+            err!("Invalid nonce")
+        }
+    }
 }
 
 async fn _password_login(
@@ -159,6 +271,14 @@ async fn _password_login(
                 event: EventType::UserFailedLogIn
             }
         )
+    }
+
+    // Check if org policy prevents password login
+    let user_orgs = UserOrganization::find_by_user_and_policy(&user.uuid, OrgPolicyType::RequireSso, conn).await;
+    if !user_orgs.is_empty() && user_orgs[0].atype != UserOrgType::Owner && user_orgs[0].atype != UserOrgType::Admin {
+        // if requires SSO is active, user is in exactly one org by policy rules
+        // policy only applies to "non-owner/non-admin" members
+        err!("Organization policy requires SSO sign in");
     }
 
     let now = Utc::now().naive_utc();
@@ -578,11 +698,134 @@ struct ConnectData {
     #[field(name = uncased("two_factor_remember"))]
     #[field(name = uncased("twofactorremember"))]
     two_factor_remember: Option<i32>,
-}
+    // Needed for authorization code
+    #[form(field = uncased("code"))]
+    code: Option<String>,
 
+}
 fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
     if value.is_none() {
         err!(msg)
     }
     Ok(())
+}
+
+#[get("/account/prevalidate?<domainHint>")]
+#[allow(non_snake_case)]
+async fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
+    let empty_result = json!({});
+
+    //we should use the domain hint here but sso is currently global and not per organization based so we just check its not empty
+    if domainHint.is_empty() {
+        err!("Domain hint shouldn't be empty")
+    }
+    
+    if !CONFIG.sso_enabled() {
+        err!("SSO Not allowed for organization")
+    }
+    
+    Ok(Json(empty_result))
+}
+
+use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
+use openidconnect::{ AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, Nonce, IssuerUrl,
+    RedirectUrl, Scope, 
+};
+use openidconnect::reqwest::async_http_client;
+use openidconnect::OAuth2TokenResponse;
+
+async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
+    let redirect = CONFIG.sso_callback_path();
+    let client_id = ClientId::new(CONFIG.sso_client_id());
+    let client_secret = ClientSecret::new(CONFIG.sso_client_secret());
+    let issuer_url =
+        IssuerUrl::new(CONFIG.sso_authority()).or(Err("invalid issuer URL"))?;
+
+    //TODO: This comparison will fail if one URI has a trailing slash and the other one does not.
+    // Should we remove trailing slashes when saving? Or when checking?
+    let provider_metadata = match CoreProviderMetadata::discover_async(issuer_url, async_http_client).await {
+        Ok(metadata) => metadata,
+        Err(_err) => {
+            return Err("Failed to discover OpenID provider");
+        }
+    };
+    
+    let client = CoreClient::from_provider_metadata(provider_metadata, client_id, Some(client_secret))
+            .set_redirect_uri(RedirectUrl::new(redirect).or(Err("Invalid redirect URL"))?);
+
+    Ok(client)
+}
+
+#[get("/connect/oidc-signin?<code>&<state>")]
+async fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect> {
+    //TODO this needs to be cleaned up, there should be a better way to do this.
+    let mut redirect_uri: &str = &String::new();
+    let split: Vec<_> = state.split('_').collect();
+    let oldstate = String::new() + split[0].as_ref() + "_" + split[1].as_ref();
+    for x in split {
+        if x.contains("redirecturl") {
+           redirect_uri = x.split("=").nth(1).unwrap();
+        } 
+    }
+    //Rebuild old state with out redirecturl
+ 
+    Ok(Redirect::to(format!("{}?code={}&state={}",redirect_uri,code,oldstate)))
+}
+
+#[get("/connect/authorize?<redirect_uri>&<domain_hint>&<state>")]
+async fn authorize(redirect_uri: String, domain_hint: String, state: String, conn: DbConn) -> ApiResult<Redirect> {
+    let org_uuid = match Organization::find_by_identifier(&domain_hint, &conn).await {
+        Some(org_uuid) => org_uuid.uuid,
+        None => err!("SSO Requires at least one organization created to work."),
+    };
+
+    match get_client_from_sso_config().await {
+        Ok(client) => {
+            let (mut authorize_url, _csrf_state, nonce) = client
+                .authorize_url(
+                    AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
+                    CsrfToken::new_random,
+                    Nonce::new_random,
+                )
+                .add_scope(Scope::new("email".to_string()))
+                .add_scope(Scope::new("profile".to_string()))
+                .url();
+
+            let sso_nonce = SsoNonce::new(org_uuid, nonce.secret().to_string());
+            sso_nonce.save(&conn).await?;
+            
+            // it seems impossible to set the state going in dynamically (requires static lifetime string)
+            // so I change it after the fact
+            let old_pairs = authorize_url.query_pairs();
+            let new_pairs = old_pairs.map(|pair| {
+                let (key, value) = pair;
+                if key == "state" {
+                    return format!("{}={}", key, format!("{}_redirecturl={}",state,redirect_uri));
+                }
+                format!("{}={}", key, value)
+            });
+            let full_query = Vec::from_iter(new_pairs).join("&");
+            authorize_url.set_query(Some(full_query.as_str()));
+
+            Ok(Redirect::to(authorize_url.to_string()))
+        }
+        Err(err) => err!("Unable to find client from identifier {}", err),
+    }
+}
+
+async fn get_auth_code_access_token(
+    code: &str,
+) -> Result<(String, String), &'static str> {
+    let oidc_code = AuthorizationCode::new(String::from(code));
+    match get_client_from_sso_config().await {
+        Ok(client) => match client.exchange_code(oidc_code).request_async(async_http_client).await {
+            Ok(token_response) => {
+                let refresh_token = token_response.refresh_token().unwrap().secret().to_string();
+                let id_token = token_response.extra_fields().id_token().unwrap().to_string();
+                Ok((refresh_token, id_token))
+            }
+            Err(_err) => Err("Failed to contact token endpoint"),
+        },
+        Err(_err) => Err("unable to find client"),
+    }
 }

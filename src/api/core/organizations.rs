@@ -86,7 +86,8 @@ pub fn routes() -> Vec<Route> {
         put_user_groups,
         delete_group_user,
         post_delete_group_user,
-        get_org_export
+        get_org_export,
+        get_auto_enroll_status
     ]
 }
 
@@ -294,6 +295,18 @@ async fn get_user_collections(headers: Headers, mut conn: DbConn) -> Json<Value>
         "Object": "list",
         "ContinuationToken": null,
     }))
+}
+
+#[get("/organizations/<identifier>/auto-enroll-status")]
+async fn get_auto_enroll_status(identifier: String, _headers: Headers, conn: DbConn) -> JsonResult {
+    let org_uuid = match Organization::find_by_identifier(&identifier, &conn).await {
+        Some(org_uuid) => org_uuid.uuid,
+        None => err!("SSO Requires at least one organization created to work."),
+    };
+    Ok(Json(json!({
+        "Id": org_uuid,
+        "ResetPasswordEnabled": false,
+    })))
 }
 
 #[get("/organizations/<org_id>/collections")]
@@ -639,7 +652,6 @@ async fn get_org_users(org_id: String, _headers: ManagerHeadersLoose, mut conn: 
         "ContinuationToken": null,
     }))
 }
-
 #[post("/organizations/<org_id>/keys", data = "<data>")]
 async fn post_org_keys(
     org_id: String,

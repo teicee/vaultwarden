@@ -349,6 +349,13 @@ impl User {
         }}
     }
 
+    pub async fn find_by_publickey(public_key: &str, conn: &mut DbConn) -> Option<Self> {
+        db_run! {conn: {
+            users::table.filter(users::public_key.eq(public_key)).first::<UserDb>(conn).ok().from_db()
+        }}
+    }
+
+
     pub async fn get_all(conn: &mut DbConn) -> Vec<Self> {
         db_run! {conn: {
             users::table.load::<UserDb>(conn).expect("Error loading users").from_db()

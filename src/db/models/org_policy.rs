@@ -28,11 +28,11 @@ pub enum OrgPolicyType {
     MasterPassword = 1,
     PasswordGenerator = 2,
     SingleOrg = 3,
-    // RequireSso = 4, // Not supported
+    RequireSso = 4,
     PersonalOwnership = 5,
     DisableSend = 6,
     SendOptions = 7,
-    // ResetPassword = 8, // Not supported
+    ResetPassword = 8,
     // MaximumVaultTimeout = 9, // Not supported (Not AGPLv3 Licensed)
     // DisablePersonalVaultExport = 10, // Not supported (Not AGPLv3 Licensed)
 }

@@ -356,9 +356,9 @@ impl<'r> FromRequest<'r> for Headers {
         let access_token: &str = match headers.get_one("Authorization") {
             Some(a) => match a.rsplit("Bearer ").next() {
                 Some(split) => split,
-                None => err_handler!("No access token provided"),
+                None => err_handler!("No access token provided - 1 "),
             },
-            None => err_handler!("No access token provided"),
+            None => err_handler!("No access token provided - 2"),
         };
 
         // Check JWT token is valid and get device and user from it

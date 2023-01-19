@@ -582,6 +582,20 @@ make_config! {
         org_groups_enabled:     bool,   false,  def,    false;
     },
 
+    /// SSO settings
+    sso {
+        /// Enabled
+        sso_enabled:         bool,   true,   def,     true;
+        /// Client ID
+        sso_client_id:       String, true,   def,   String::new();
+        /// Client Key
+        sso_client_secret:      Pass,   true,  def,   String::new();
+        /// Authority Server
+        sso_authority:          String, true,   def,   String::new();
+        /// CallBack Path
+        sso_callback_path:      String, false,   gen,  |c| generate_sso_callback_path(&c.domain);
+    },
+
     /// Yubikey settings
     yubico: _enable_yubico {
         /// Enabled
@@ -715,6 +729,13 @@ fn validate_config(cfg: &ConfigItems) -> Result<(), Error> {
         && !(cfg.duo_host.is_some() && cfg.duo_ikey.is_some() && cfg.duo_skey.is_some())
     {
         err!("All Duo options need to be set for global Duo support")
+    }
+
+    if cfg.sso_enabled {
+        if cfg.sso_client_id.is_empty() || cfg.sso_client_secret.is_empty() || cfg.sso_authority.is_empty()
+        {
+            err!("`SSO_CLIENT_ID`, `SSO_CLIENT_SECRET` and `SSO_AUTHORITY` must be set for SSO support")
+        }
     }
 
     if cfg._enable_yubico {
@@ -855,6 +876,10 @@ fn generate_smtp_img_src(embed_images: bool, domain: &str) -> String {
     } else {
         format!("{domain}/vw_static/")
     }
+}
+
+fn generate_sso_callback_path(domain: &str) -> String {
+    format!("{domain}/identity/connect/oidc-signin")
 }
 
 /// Generate the correct URL for the icon service.

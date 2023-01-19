@@ -228,16 +228,16 @@ async fn post_set_password(data: JsonUpcase<SetPasswordData>, headers: Headers, 
     if let Some(client_kdf_iter) = data.KdfIterations {
         user.client_kdf_iter = client_kdf_iter;
     }
-    
+
     if let Some(client_kdf_type) = data.Kdf {
         user.client_kdf_type = client_kdf_type;
     }
-    
+
     user.set_password(&data.MasterPasswordHash, None);
     user.akey = data.Key;
     user.password_hint = password_hint;
     user.reset_security_stamp();
-    
+
     if let Some(keys) = data.Keys {
         user.private_key = Some(keys.EncryptedPrivateKey);
         user.public_key = Some(keys.PublicKey);
@@ -275,7 +275,6 @@ struct ProfileData {
     // MasterPasswordHint: Option<String>, // Ignored, has been moved to ChangePassData
     Name: String,
 }
-
 
 #[put("/accounts/profile", data = "<data>")]
 async fn put_profile(data: JsonUpcase<ProfileData>, headers: Headers, conn: DbConn) -> JsonResult {

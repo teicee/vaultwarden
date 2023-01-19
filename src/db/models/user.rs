@@ -360,7 +360,6 @@ impl User {
         }}
     }
 
-
     pub async fn get_all(conn: &mut DbConn) -> Vec<Self> {
         db_run! {conn: {
             users::table.load::<UserDb>(conn).expect("Error loading users").from_db()

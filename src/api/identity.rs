@@ -125,9 +125,14 @@ struct TokenPayload {
     nonce: String,
 }
 
-async fn _authorization_login(data: ConnectData, user_uuid: &mut Option<String>,conn: &mut DbConn, ip: &ClientIp) -> JsonResult {
+async fn _authorization_login(
+    data: ConnectData,
+    user_uuid: &mut Option<String>,
+    conn: &mut DbConn,
+    ip: &ClientIp,
+) -> JsonResult {
     let code = data.code.as_ref().unwrap();
-    
+
     //identifer was removed from the login process so the below function returns the first organization always.
     let organization = Organization::find_by_identifier("vaultwarden", conn).await.unwrap();
 
@@ -149,7 +154,7 @@ async fn _authorization_login(data: ConnectData, user_uuid: &mut Option<String>,
 
     match SsoNonce::find_by_org_and_nonce(&organization.uuid, &nonce, conn).await {
         Some(sso_nonce) => {
-            match sso_nonce.delete(&conn).await {
+            match sso_nonce.delete(conn).await {
                 Ok(_) => {
                     // let expiry = token.exp;
                     let user_email = token.email;
@@ -169,7 +174,7 @@ async fn _authorization_login(data: ConnectData, user_uuid: &mut Option<String>,
 
                     // Set the user_uuid here to be passed back used for event logging.
                     *user_uuid = Some(user.uuid.clone());
-                
+
                     let (mut device, new_device) = get_device(&data, conn, &user).await;
 
                     let twofactor_token = twofactor_auth(&user.uuid, &data, &mut device, ip, conn).await?;
@@ -701,7 +706,6 @@ struct ConnectData {
     // Needed for authorization code
     #[form(field = uncased("code"))]
     code: Option<String>,
-
 }
 fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
     if value.is_none() {
@@ -712,34 +716,33 @@ fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
 
 #[get("/account/prevalidate?<domainHint>")]
 #[allow(non_snake_case)]
-async fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
+fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
     let empty_result = json!({});
 
     //we should use the domain hint here but sso is currently global and not per organization based so we just check its not empty
     if domainHint.is_empty() {
         err!("Domain hint shouldn't be empty")
     }
-    
+
     if !CONFIG.sso_enabled() {
         err!("SSO Not allowed for organization")
     }
-    
+
     Ok(Json(empty_result))
 }
 
 use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
-use openidconnect::{ AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, Nonce, IssuerUrl,
-    RedirectUrl, Scope, 
-};
 use openidconnect::reqwest::async_http_client;
 use openidconnect::OAuth2TokenResponse;
+use openidconnect::{
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,
+};
 
 async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
     let redirect = CONFIG.sso_callback_path();
     let client_id = ClientId::new(CONFIG.sso_client_id());
     let client_secret = ClientSecret::new(CONFIG.sso_client_secret());
-    let issuer_url =
-        IssuerUrl::new(CONFIG.sso_authority()).or(Err("invalid issuer URL"))?;
+    let issuer_url = IssuerUrl::new(CONFIG.sso_authority()).or(Err("invalid issuer URL"))?;
 
     //TODO: This comparison will fail if one URI has a trailing slash and the other one does not.
     // Should we remove trailing slashes when saving? Or when checking?
@@ -749,27 +752,27 @@ async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
             return Err("Failed to discover OpenID provider");
         }
     };
-    
+
     let client = CoreClient::from_provider_metadata(provider_metadata, client_id, Some(client_secret))
-            .set_redirect_uri(RedirectUrl::new(redirect).or(Err("Invalid redirect URL"))?);
+        .set_redirect_uri(RedirectUrl::new(redirect).or(Err("Invalid redirect URL"))?);
 
     Ok(client)
 }
 
 #[get("/connect/oidc-signin?<code>&<state>")]
-async fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect> {
+fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect> {
     //TODO this needs to be cleaned up, there should be a better way to do this.
-    let mut redirect_uri: &str = &String::new();
+    let mut redirect_uri: &str = "";
     let split: Vec<_> = state.split('_').collect();
-    let oldstate = String::new() + split[0].as_ref() + "_" + split[1].as_ref();
+    let oldstate = String::new() + split[0] + "_" + split[1];
     for x in split {
         if x.contains("redirecturl") {
-           redirect_uri = x.split("=").nth(1).unwrap();
-        } 
+            redirect_uri = x.split("=").nth(1).unwrap();
+        }
     }
     //Rebuild old state with out redirecturl
- 
-    Ok(Redirect::to(format!("{}?code={}&state={}",redirect_uri,code,oldstate)))
+
+    Ok(Redirect::to(format!("{}?code={}&state={}", redirect_uri, code, oldstate)))
 }
 
 #[get("/connect/authorize?<redirect_uri>&<domain_hint>&<state>")]
@@ -793,14 +796,14 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
 
             let sso_nonce = SsoNonce::new(org_uuid, nonce.secret().to_string());
             sso_nonce.save(&conn).await?;
-            
+
             // it seems impossible to set the state going in dynamically (requires static lifetime string)
             // so I change it after the fact
             let old_pairs = authorize_url.query_pairs();
             let new_pairs = old_pairs.map(|pair| {
                 let (key, value) = pair;
                 if key == "state" {
-                    return format!("{}={}", key, format!("{}_redirecturl={}",state,redirect_uri));
+                    return format!("{}={}", key, format!("{}_redirecturl={}", state, redirect_uri));
                 }
                 format!("{}={}", key, value)
             });
@@ -813,9 +816,7 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
     }
 }
 
-async fn get_auth_code_access_token(
-    code: &str,
-) -> Result<(String, String), &'static str> {
+async fn get_auth_code_access_token(code: &str) -> Result<(String, String), &'static str> {
     let oidc_code = AuthorizationCode::new(String::from(code));
     match get_client_from_sso_config().await {
         Ok(client) => match client.exchange_code(oidc_code).request_async(async_http_client).await {

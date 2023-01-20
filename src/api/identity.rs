@@ -767,7 +767,7 @@ fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect>
     let oldstate = String::new() + split[0] + "_" + split[1];
     for x in split {
         if x.contains("redirecturl") {
-            redirect_uri = x.split("=").nth(1).unwrap();
+            redirect_uri = x.split('=').nth(1).unwrap();
         }
     }
     //Rebuild old state with out redirecturl
@@ -803,7 +803,7 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
             let new_pairs = old_pairs.map(|pair| {
                 let (key, value) = pair;
                 if key == "state" {
-                    return format!("{}={}", key, format!("{}_redirecturl={}", state, redirect_uri));
+                    return format!("{}={}_redirecturl={}", key, state, redirect_uri);
                 }
                 format!("{}={}", key, value)
             });

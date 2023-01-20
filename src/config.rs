@@ -731,9 +731,11 @@ fn validate_config(cfg: &ConfigItems) -> Result<(), Error> {
         err!("All Duo options need to be set for global Duo support")
     }
 
-    if cfg.sso_enabled
-        && (cfg.sso_client_id.is_empty() || cfg.sso_client_secret.is_empty() || cfg.sso_authority.is_empty())
+    if cfg.sso_enabled 
+        && (cfg.sso_client_id.is_empty() || cfg.sso_client_secret.is_empty() || cfg.sso_authority.is_empty()) 
     {
+        err!("`SSO_CLIENT_ID`, `SSO_CLIENT_SECRET` and `SSO_AUTHORITY` must be set for SSO support")
+    }
 
     if cfg._enable_yubico {
         if cfg.yubico_client_id.is_some() != cfg.yubico_secret_key.is_some() {

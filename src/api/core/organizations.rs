@@ -55,6 +55,7 @@ pub fn routes() -> Vec<Route> {
         post_org_import,
         list_policies,
         list_policies_token,
+        list_policies_invited_user,
         get_policy,
         put_policy,
         get_organization_tax,
@@ -1474,6 +1475,21 @@ async fn list_policies_token(org_id: String, token: String, mut conn: DbConn) ->
         "ContinuationToken": null
     })))
 }
+
+#[allow(non_snake_case)]
+#[get("/organizations/<org_id>/policies/invited-user?<userId>")]
+async fn list_policies_invited_user(org_id: String, userId: String, mut conn: DbConn) -> JsonResult {
+    //We should confirm the user is part of the organization, but unique domain_hints must be supported first.
+    let policies = OrgPolicy::find_by_org(&org_id, &mut conn).await;
+    let policies_json: Vec<Value> = policies.iter().map(OrgPolicy::to_json).collect();
+
+    Ok(Json(json!({
+        "Data": policies_json,
+        "Object": "list",
+        "ContinuationToken": null
+    })))
+}
+
 
 #[get("/organizations/<org_id>/policies/<pol_type>")]
 async fn get_policy(org_id: String, pol_type: i32, _headers: AdminHeaders, mut conn: DbConn) -> JsonResult {

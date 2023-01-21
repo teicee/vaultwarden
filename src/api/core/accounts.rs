@@ -233,28 +233,23 @@ async fn post_set_password(data: JsonUpcase<SetPasswordData>, headers: Headers, 
         user.client_kdf_type = client_kdf_type;
     }
 
-    user.set_password(&data.MasterPasswordHash, None);
+    //We need to allow revision-date to use the old security_timestamp
+    let routes = vec!["revision_date"];
+    let routes: Option<Vec<String>> =
+        Some(routes.iter().map(ToString::to_string).collect());
+
+    user.set_password(&data.MasterPasswordHash, routes);
     user.akey = data.Key;
     user.password_hint = password_hint;
-    user.reset_security_stamp();
 
     if let Some(keys) = data.Keys {
         user.private_key = Some(keys.EncryptedPrivateKey);
         user.public_key = Some(keys.PublicKey);
     }
 
-    //TODO Should update this with a email for master password change
-    //if CONFIG.mail_enabled() {
-    //    if CONFIG.signups_verify() && !verified_by_invite {
-    //       if let Err(e) = mail::send_(&user.email, &user.uuid).await {
-    //            error!("Error sending welcome email: {:#?}", e);
-    //        }
-
-    //        user.last_verifying_at = Some(user.created_at);
-    //    } else if let Err(e) = mail::send_welcome(&user.email).await {
-    //        error!("Error sending welcome email: {:#?}", e);
-    //    }
-    //}
+    if CONFIG.mail_enabled() {
+        mail::send_set_password(&user.email.to_lowercase(), &user.name).await?;
+    }
 
     user.save(&mut conn).await?;
     Ok(Json(json!({
@@ -673,6 +668,7 @@ async fn post_verify_email_token(data: JsonUpcase<VerifyEmailTokenData>, mut con
         Ok(claims) => claims,
         Err(_) => err!("Invalid claim"),
     };
+    
     if claims.sub != user.uuid {
         err!("Invalid claim");
     }

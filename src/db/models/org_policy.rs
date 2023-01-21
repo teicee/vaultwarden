@@ -32,7 +32,7 @@ pub enum OrgPolicyType {
     PersonalOwnership = 5,
     DisableSend = 6,
     SendOptions = 7,
-    ResetPassword = 8,
+    // ResetPassword = 8, // Not supported
     // MaximumVaultTimeout = 9, // Not supported (Not AGPLv3 Licensed)
     // DisablePersonalVaultExport = 10, // Not supported (Not AGPLv3 Licensed)
 }

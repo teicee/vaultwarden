@@ -149,7 +149,7 @@ impl User {
     /// * `password` - A str which contains a hashed version of the users master password.
     /// * `allow_next_route` - A Option<Vec<String>> with the function names of the next allowed (rocket) routes.
     ///                       These routes are able to use the previous stamp id for the next 2 minutes.
-    ///                       After these 2 minutes this stamp will expire.
+    ///                       After these 2 minutes this stamp will expire.f
     ///
     pub fn set_password(&mut self, password: &str, allow_next_route: Option<Vec<String>>) {
         self.password_hash = crypto::hash_password(password.as_bytes(), &self.salt, self.password_iterations as u32);
@@ -351,12 +351,6 @@ impl User {
     pub async fn find_by_uuid(uuid: &str, conn: &mut DbConn) -> Option<Self> {
         db_run! {conn: {
             users::table.filter(users::uuid.eq(uuid)).first::<UserDb>(conn).ok().from_db()
-        }}
-    }
-
-    pub async fn find_by_publickey(public_key: &str, conn: &mut DbConn) -> Option<Self> {
-        db_run! {conn: {
-            users::table.filter(users::public_key.eq(public_key)).first::<UserDb>(conn).ok().from_db()
         }}
     }
 

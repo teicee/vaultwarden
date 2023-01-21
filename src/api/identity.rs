@@ -57,8 +57,12 @@ async fn login(data: Form<ConnectData>, client_header: ClientHeaders, mut conn: 
             _api_key_login(data, &mut user_uuid, &mut conn, &ip).await
         }
         "authorization_code" => {
+            _check_is_some(&data.client_id, "client_id cannot be blank")?;
             _check_is_some(&data.code, "code cannot be blank")?;
-            _check_is_some(&data.device_identifier, "device identifier cannot be blank")?;
+
+            _check_is_some(&data.device_identifier, "device_identifier cannot be blank")?;
+            _check_is_some(&data.device_name, "device_name cannot be blank")?;
+            _check_is_some(&data.device_type, "device_type cannot be blank")?;
             _authorization_login(data, &mut user_uuid, &mut conn, &ip).await
         }
         t => err!("Invalid type", t),
@@ -112,7 +116,7 @@ async fn _refresh_login(data: ConnectData, conn: &mut DbConn) -> JsonResult {
         "PrivateKey": user.private_key,
         "Kdf": user.client_kdf_type,
         "KdfIterations": user.client_kdf_iter,
-        "ResetMasterPassword": user.password_hash.is_empty(),
+        "ResetMasterPassword": false, // TODO: according to official server seems something like: user.password_hash.is_empty(), but would need testing
         "scope": scope,
         "unofficialServer": true,
     })))
@@ -131,6 +135,11 @@ async fn _authorization_login(
     conn: &mut DbConn,
     ip: &ClientIp,
 ) -> JsonResult {
+    let scope = data.scope.as_ref().unwrap();
+    if scope != "api offline_access" {
+        err!("Scope not supported")
+    }
+    let scope_vec = vec!["api".into(), "offline_access".into()];
     let code = data.code.as_ref().unwrap();
 
     //identifer was removed from the login process so the below function returns the first organization always.
@@ -169,6 +178,8 @@ async fn _authorization_login(
                     };
 
                     if new_user {
+                        user.verified_at = Some(Utc::now().naive_utc());
+                        
                         user.save(conn).await?;
                     }
 
@@ -193,23 +204,23 @@ async fn _authorization_login(
 
                     device.refresh_token = refresh_token.clone();
                     device.save(conn).await?;
-
-                    let scope_vec = vec!["api".into(), "offline_access".into()];
                     let orgs = UserOrganization::find_confirmed_by_user(&user.uuid, conn).await;
-                    let (access_token_new, expires_in) = device.refresh_tokens(&user, orgs, scope_vec);
+                    let (access_token, expires_in) = device.refresh_tokens(&user, orgs, scope_vec);
                     device.save(conn).await?;
 
                     let mut result = json!({
-                        "access_token": access_token_new,
-                        "expires_in": expires_in,
+                        "access_token": access_token,
                         "token_type": "Bearer",
                         "refresh_token": refresh_token,
+                        "expires_in": expires_in,
                         "Key": user.akey,
                         "PrivateKey": user.private_key,
                         "Kdf": user.client_kdf_type,
                         "KdfIterations": user.client_kdf_iter,
                         "ResetMasterPassword": user.password_hash.is_empty(),
-                        "scope": "api offline_access",
+                        // "forcePasswordReset": false,
+                        // "keyConnectorUrl": false,
+                        "scope": scope,
                         "unofficialServer": true,
                     });
 
@@ -731,11 +742,12 @@ fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
     Ok(Json(empty_result))
 }
 
-use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
+use openidconnect::core::{CoreGenderClaim, CoreClient, CoreProviderMetadata, CoreResponseType};
 use openidconnect::reqwest::async_http_client;
 use openidconnect::OAuth2TokenResponse;
+use openidconnect::AdditionalClaims;
 use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,UserInfoClaims, 
 };
 
 async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
@@ -792,6 +804,7 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
                 )
                 .add_scope(Scope::new("email".to_string()))
                 .add_scope(Scope::new("profile".to_string()))
+                .add_extra_param("domain_identifer",domain_hint)
                 .url();
 
             let sso_nonce = SsoNonce::new(org_uuid, nonce.secret().to_string());
@@ -815,6 +828,14 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
         Err(err) => err!("Unable to find client from identifier {}", err),
     }
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+struct GitLabClaims {
+    // Deprecated and thus optional as it might be removed in the futre
+    sub_legacy: Option<String>,
+    groups: Vec<String>,
+}
+impl AdditionalClaims for GitLabClaims {}
 
 async fn get_auth_code_access_token(code: &str) -> Result<(String, String), &'static str> {
     let oidc_code = AuthorizationCode::new(String::from(code));

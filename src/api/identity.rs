@@ -179,7 +179,6 @@ async fn _authorization_login(
 
                     if new_user {
                         user.verified_at = Some(Utc::now().naive_utc());
-                        
                         user.save(conn).await?;
                     }
 
@@ -742,13 +741,13 @@ fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
     Ok(Json(empty_result))
 }
 
-use openidconnect::core::{CoreGenderClaim, CoreClient, CoreProviderMetadata, CoreResponseType};
+use openidconnect::core::{CoreClient, CoreGenderClaim, CoreProviderMetadata, CoreResponseType};
 use openidconnect::reqwest::async_http_client;
-use openidconnect::OAuth2TokenResponse;
 use openidconnect::AdditionalClaims;
+use openidconnect::OAuth2TokenResponse;
 use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,UserInfoClaims, 
-};
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,
+ };
 
 async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
     let redirect = CONFIG.sso_callback_path();
@@ -804,7 +803,7 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
                 )
                 .add_scope(Scope::new("email".to_string()))
                 .add_scope(Scope::new("profile".to_string()))
-                .add_extra_param("domain_identifer",domain_hint)
+                .add_extra_param("domain_identifer", domain_hint)
                 .url();
 
             let sso_nonce = SsoNonce::new(org_uuid, nonce.secret().to_string());

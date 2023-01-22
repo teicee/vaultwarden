@@ -741,13 +741,13 @@ fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
     Ok(Json(empty_result))
 }
 
-use openidconnect::core::{CoreClient, CoreGenderClaim, CoreProviderMetadata, CoreResponseType};
+use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
 use openidconnect::reqwest::async_http_client;
 use openidconnect::AdditionalClaims;
 use openidconnect::OAuth2TokenResponse;
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,
- };
+};
 
 async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
     let redirect = CONFIG.sso_callback_path();

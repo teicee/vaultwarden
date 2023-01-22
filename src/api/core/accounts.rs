@@ -235,8 +235,7 @@ async fn post_set_password(data: JsonUpcase<SetPasswordData>, headers: Headers, 
 
     //We need to allow revision-date to use the old security_timestamp
     let routes = vec!["revision_date"];
-    let routes: Option<Vec<String>> =
-        Some(routes.iter().map(ToString::to_string).collect());
+    let routes: Option<Vec<String>> = Some(routes.iter().map(ToString::to_string).collect());
 
     user.set_password(&data.MasterPasswordHash, routes);
     user.akey = data.Key;
@@ -668,7 +667,7 @@ async fn post_verify_email_token(data: JsonUpcase<VerifyEmailTokenData>, mut con
         Ok(claims) => claims,
         Err(_) => err!("Invalid claim"),
     };
-    
+
     if claims.sub != user.uuid {
         err!("Invalid claim");
     }

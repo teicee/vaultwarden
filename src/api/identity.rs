@@ -203,7 +203,17 @@ async fn _authorization_login(
 
                     device.refresh_token = refresh_token.clone();
                     device.save(conn).await?;
+
                     let orgs = UserOrganization::find_confirmed_by_user(&user.uuid, conn).await;
+                    
+                    //Work around due to normal accept call not firing, disabled by default
+                    if CONFIG.sso_acceptall_invites() {  
+                        for mut user_org in UserOrganization::find_invited_by_user(&user.uuid, conn).await.iter_mut() {
+                            user_org.status = UserOrgStatus::Accepted as i32;
+                            user_org.save(conn).await?;
+                        }
+                    }
+
                     let (access_token, expires_in) = device.refresh_tokens(&user, orgs, scope_vec);
                     device.save(conn).await?;
 
@@ -727,8 +737,6 @@ fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
 #[get("/account/prevalidate?<domainHint>")]
 #[allow(non_snake_case)]
 fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
-    let empty_result = json!({});
-
     //we should use the domain hint here but sso is currently global and not per organization based so we just check its not empty
     if domainHint.is_empty() {
         err!("Domain hint shouldn't be empty")
@@ -738,7 +746,10 @@ fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
         err!("SSO Not allowed for organization")
     }
 
-    Ok(Json(empty_result))
+    //Token should be a tokenized string with orgid, hint + expiry date
+    Ok(Json(json!({
+        "token": "",
+    })))
 }
 
 use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
@@ -781,7 +792,6 @@ fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect>
             redirect_uri = x.split('=').nth(1).unwrap();
         }
     }
-    //Rebuild old state with out redirecturl
 
     Ok(Redirect::to(format!("{}?code={}&state={}", redirect_uri, code, oldstate)))
 }
@@ -803,7 +813,6 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
                 )
                 .add_scope(Scope::new("email".to_string()))
                 .add_scope(Scope::new("profile".to_string()))
-                .add_extra_param("domain_identifer", domain_hint)
                 .url();
 
             let sso_nonce = SsoNonce::new(org_uuid, nonce.secret().to_string());

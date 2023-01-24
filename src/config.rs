@@ -586,6 +586,8 @@ make_config! {
     sso {
         /// Enabled
         sso_enabled:         bool,   true,   def,     true;
+        ///
+        sso_acceptall_invites: bool, true,   def,     false;
         /// Client ID
         sso_client_id:       String, true,   def,   String::new();
         /// Client Key

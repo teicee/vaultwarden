@@ -204,7 +204,7 @@ async fn _authorization_login(
                     device.refresh_token = refresh_token.clone();
                     device.save(conn).await?;
 
-                    let orgs = UserOrganization::find_confirmed_by_user(&user.uuid, conn).await
+                    let orgs = UserOrganization::find_confirmed_by_user(&user.uuid, conn).await;
                     //Work around due to normal accept call not firing, disabled by default
                     if CONFIG.sso_acceptall_invites() {
                         for mut user_org in UserOrganization::find_invited_by_user(&user.uuid, conn).await.iter_mut() {

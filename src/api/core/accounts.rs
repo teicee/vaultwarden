@@ -236,8 +236,7 @@ async fn post_set_password(data: JsonUpcase<SetPasswordData>, headers: Headers, 
     let routes = vec!["revision_date"];
     let routes: Option<Vec<String>> = Some(routes.iter().map(ToString::to_string).collect());
 
-    user.set_password(&data.MasterPasswordHash, routes);
-    user.akey = data.Key;
+    user.set_password(&data.MasterPasswordHash, Some(data.Key), true, routes);
     user.password_hint = password_hint;
 
     if let Some(keys) = data.Keys {

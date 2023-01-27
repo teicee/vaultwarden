@@ -745,11 +745,6 @@ fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
 #[get("/account/prevalidate?<domainHint>")]
 #[allow(non_snake_case)]
 fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
-    //we should use the domain hint here but sso is currently global and not per organization based so we just check its not empty
-    if domainHint.is_empty() {
-        err!("Domain hint shouldn't be empty")
-    }
-
     if !CONFIG.sso_enabled() {
         err!("SSO Not allowed for organization")
     }
@@ -844,14 +839,6 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
         Err(err) => err!("Unable to find client from identifier {}", err),
     }
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-struct GitLabClaims {
-    // Deprecated and thus optional as it might be removed in the futre
-    sub_legacy: Option<String>,
-    groups: Vec<String>,
-}
-impl AdditionalClaims for GitLabClaims {}
 
 async fn get_auth_code_access_token(code: &str) -> Result<(String, String), &'static str> {
     let oidc_code = AuthorizationCode::new(String::from(code));

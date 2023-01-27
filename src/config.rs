@@ -585,7 +585,7 @@ make_config! {
     /// SSO settings
     sso {
         /// Enabled
-        sso_enabled:         bool,   true,   def,     true;
+        sso_enabled:         bool,   true,   def,     false;
         ///
         sso_acceptall_invites: bool, true,   def,     false;
         /// Client ID

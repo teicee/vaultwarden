@@ -745,6 +745,11 @@ fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
 #[get("/account/prevalidate?<domainHint>")]
 #[allow(non_snake_case)]
 fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
+
+    if domainHint.is_empty() {
+        err!("domainhint should never be empty.")
+    }
+
     if !CONFIG.sso_enabled() {
         err!("SSO Not allowed for organization")
     }
@@ -757,7 +762,6 @@ fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
 
 use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
 use openidconnect::reqwest::async_http_client;
-use openidconnect::AdditionalClaims;
 use openidconnect::OAuth2TokenResponse;
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,

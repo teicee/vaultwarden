@@ -1477,9 +1477,14 @@ async fn list_policies_token(org_id: String, token: String, mut conn: DbConn) ->
 }
 
 #[allow(non_snake_case)]
-#[get("/organizations/<org_id>/policies/invited-user?<_userId>")]
-async fn list_policies_invited_user(org_id: String, _userId: String, mut conn: DbConn) -> JsonResult {
+#[get("/organizations/<org_id>/policies/invited-user?<userId>")]
+async fn list_policies_invited_user(org_id: String, userId: String, mut conn: DbConn) -> JsonResult {
     //We should confirm the user is part of the organization, but unique domain_hints must be supported first.
+
+    if userId.is_empty() {
+        err!("userId is empty.");
+    }
+    
     let policies = OrgPolicy::find_by_org(&org_id, &mut conn).await;
     let policies_json: Vec<Value> = policies.iter().map(OrgPolicy::to_json).collect();
 

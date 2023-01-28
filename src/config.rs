@@ -614,6 +614,10 @@ make_config! {
         sso_callback_path:      String, false,  gen,    |c| generate_sso_callback_path(&c.domain);
         /// Allow worka around so SSO logins accept all invites
         sso_acceptall_invites: bool, true,   def,     false;
+        ///
+        sso_keyconnector_enabled: bool,   true,   def,     false;
+        ///
+        sso_keyconnectorurl: String, false,   gen,     |c| generate_sso_keyconnectorurl_path(&c.domain);
     },
 
     /// Yubikey settings
@@ -970,6 +974,10 @@ fn generate_smtp_img_src(embed_images: bool, domain: &str) -> String {
 
 fn generate_sso_callback_path(domain: &str) -> String {
     format!("{domain}/identity/connect/oidc-signin")
+}
+
+fn generate_sso_keyconnectorurl_path(domain: &str) -> String {
+    format!("{domain}/key-connector")
 }
 
 /// Generate the correct URL for the icon service.

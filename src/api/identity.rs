@@ -246,13 +246,17 @@ async fn _authorization_login(
                         "KdfParallelism": user.client_kdf_parallelism,
                         "ResetMasterPassword": user.password_hash.is_empty(),
                         // "forcePasswordReset": false,
-                        // "keyConnectorUrl": false,
+                        // "keyConnectorUrl": false
                         "scope": scope,
                         "unofficialServer": true,
                     });
 
                     if let Some(token) = twofactor_token {
                         result["TwoFactorToken"] = Value::String(token);
+                    }
+
+                    if CONFIG.sso_keyconnector_enabled() {
+                        result["keyConnectorUrl"] = Value::String(CONFIG.sso_keyconnectorurl() );
                     }
 
                     info!("User {} logged in successfully. IP: {}", user.email, ip.ip);

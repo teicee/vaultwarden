@@ -585,9 +585,7 @@ make_config! {
     /// SSO settings
     sso {
         /// Enabled
-        sso_enabled:         bool,   true,   def,     false;
-        ///
-        sso_acceptall_invites: bool, true,   def,     false;
+        sso_enabled:         bool,   true,   def,     true;
         /// Client ID
         sso_client_id:       String, true,   def,   String::new();
         /// Client Key
@@ -1181,12 +1179,12 @@ where
     reg!("email/send_single_org_removed_from_org", ".html");
     reg!("email/send_org_invite", ".html");
     reg!("email/send_emergency_access_invite", ".html");
+    reg!("email/set_password", ".html");
     reg!("email/twofactor_email", ".html");
     reg!("email/verify_email", ".html");
     reg!("email/welcome", ".html");
     reg!("email/welcome_must_verify", ".html");
     reg!("email/smtp_test", ".html");
-    reg!("email/set_password", ".html");
 
     reg!("admin/base");
     reg!("admin/login");

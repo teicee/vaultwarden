@@ -226,9 +226,7 @@ table! {
 }
 
 table! {
-    sso_nonce (uuid) {
-        uuid -> Text,
-        org_uuid -> Text,
+    sso_nonce (nonce) {
         nonce -> Text,
     }
 }
@@ -303,7 +301,6 @@ joinable!(groups_users -> groups (groups_uuid));
 joinable!(collections_groups -> collections (collections_uuid));
 joinable!(collections_groups -> groups (groups_uuid));
 joinable!(event -> users_organizations (uuid));
-joinable!(sso_nonce -> organizations (org_uuid));
 
 allow_tables_to_appear_in_same_query!(
     attachments,

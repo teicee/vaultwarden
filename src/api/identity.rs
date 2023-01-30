@@ -139,11 +139,9 @@ async fn _authorization_login(
     if scope != "api offline_access" {
         err!("Scope not supported")
     }
+
     let scope_vec = vec!["api".into(), "offline_access".into()];
     let code = data.code.as_ref().unwrap();
-
-    //identifer was removed from the login process so the below function returns the first organization always.
-    let organization = Organization::find_by_identifier("vaultwarden", conn).await.unwrap();
 
     let (refresh_token, id_token) = match get_auth_code_access_token(code).await {
         Ok((refresh_token, id_token)) => (refresh_token, id_token),
@@ -161,7 +159,7 @@ async fn _authorization_login(
     let nonce = token.nonce;
     let mut new_user = false;
 
-    match SsoNonce::find_by_org_and_nonce(&organization.uuid, &nonce, conn).await {
+    match SsoNonce::find(&nonce, conn).await {
         Some(sso_nonce) => {
             match sso_nonce.delete(conn).await {
                 Ok(_) => {
@@ -205,14 +203,6 @@ async fn _authorization_login(
                     device.save(conn).await?;
 
                     let orgs = UserOrganization::find_confirmed_by_user(&user.uuid, conn).await;
-                    //Work around due to normal accept call not firing, disabled by default
-                    if CONFIG.sso_acceptall_invites() {
-                        for mut user_org in UserOrganization::find_invited_by_user(&user.uuid, conn).await.iter_mut() {
-                            user_org.status = UserOrgStatus::Accepted as i32;
-                            user_org.save(conn).await?;
-                        }
-                    }
-
                     let (access_token, expires_in) = device.refresh_tokens(&user, orgs, scope_vec);
                     device.save(conn).await?;
 
@@ -742,19 +732,10 @@ fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
     Ok(())
 }
 
-#[get("/account/prevalidate?<domainHint>")]
+
+#[get("/account/prevalidate")]
 #[allow(non_snake_case)]
-fn prevalidate(domainHint: String, _conn: DbConn) -> JsonResult {
-
-    if domainHint.is_empty() {
-        err!("domainhint should never be empty.")
-    }
-
-    if !CONFIG.sso_enabled() {
-        err!("SSO Not allowed for organization")
-    }
-
-    //Token should be a tokenized string with orgid, hint + expiry date
+fn prevalidate() -> JsonResult {
     Ok(Json(json!({
         "token": "",
     })))
@@ -803,13 +784,8 @@ fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect>
     Ok(Redirect::to(format!("{}?code={}&state={}", redirect_uri, code, oldstate)))
 }
 
-#[get("/connect/authorize?<redirect_uri>&<domain_hint>&<state>")]
-async fn authorize(redirect_uri: String, domain_hint: String, state: String, conn: DbConn) -> ApiResult<Redirect> {
-    let org_uuid = match Organization::find_by_identifier(&domain_hint, &conn).await {
-        Some(org_uuid) => org_uuid.uuid,
-        None => err!("SSO Requires at least one organization created to work."),
-    };
-
+#[get("/connect/authorize?<redirect_uri>&<state>")]
+async fn authorize(redirect_uri: String, state: String, mut conn: DbConn) -> ApiResult<Redirect> {
     match get_client_from_sso_config().await {
         Ok(client) => {
             let (mut authorize_url, _csrf_state, nonce) = client
@@ -822,8 +798,8 @@ async fn authorize(redirect_uri: String, domain_hint: String, state: String, con
                 .add_scope(Scope::new("profile".to_string()))
                 .url();
 
-            let sso_nonce = SsoNonce::new(org_uuid, nonce.secret().to_string());
-            sso_nonce.save(&conn).await?;
+            let sso_nonce = SsoNonce::new(nonce.secret().to_string());
+            sso_nonce.save(&mut conn).await?;
 
             // it seems impossible to set the state going in dynamically (requires static lifetime string)
             // so I change it after the fact

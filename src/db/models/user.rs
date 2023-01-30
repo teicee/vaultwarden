@@ -150,7 +150,7 @@ impl User {
     /// * `new_key` - A String  which contains the new aKey value of the users master password.
     /// * `allow_next_route` - A Option<Vec<String>> with the function names of the next allowed (rocket) routes.
     ///                       These routes are able to use the previous stamp id for the next 2 minutes.
-    ///                       After these 2 minutes this stamp will expire.f
+    ///                       After these 2 minutes this stamp will expire.
     ///
     pub fn set_password(
         &mut self,

@@ -299,7 +299,7 @@ async fn get_user_collections(headers: Headers, mut conn: DbConn) -> Json<Value>
 }
 
 #[get("/organizations/<_identifier>/auto-enroll-status")]
-async fn get_auto_enroll_status(_identifier: String) -> JsonResult {
+fn get_auto_enroll_status(_identifier: String) -> JsonResult {
     Ok(Json(json!({
         "ResetPasswordEnabled": false,
     })))
@@ -1479,7 +1479,7 @@ async fn list_policies_invited_user(org_id: String, userId: String, mut conn: Db
     if userId.is_empty() {
         err!("userId is empty.");
     }
-    
+
     let policies = OrgPolicy::find_by_org(&org_id, &mut conn).await;
     let policies_json: Vec<Value> = policies.iter().map(OrgPolicy::to_json).collect();
 

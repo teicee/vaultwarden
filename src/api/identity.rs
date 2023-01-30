@@ -732,7 +732,6 @@ fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
     Ok(())
 }
 
-
 #[get("/account/prevalidate")]
 #[allow(non_snake_case)]
 fn prevalidate() -> JsonResult {

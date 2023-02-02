@@ -297,12 +297,8 @@ async fn _password_login(
         )
     }
 
-    // Check if org policy prevents password login
-    let user_orgs = UserOrganization::find_by_user_and_policy(&user.uuid, OrgPolicyType::RequireSso, conn).await;
-    if !user_orgs.is_empty() && user_orgs[0].atype != UserOrgType::Owner && user_orgs[0].atype != UserOrgType::Admin {
-        // if requires SSO is active, user is in exactly one org by policy rules
-        // policy only applies to "non-owner/non-admin" members
-        err!("Organization policy requires SSO sign in");
+    if CONFIG.sso_enabled() && CONFIG.sso_only() {
+        err!("SSO sign-in is required");
     }
 
     let now = Utc::now().naive_utc();
@@ -731,7 +727,6 @@ fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
     }
     Ok(())
 }
-
 
 #[get("/account/prevalidate")]
 #[allow(non_snake_case)]

@@ -585,15 +585,17 @@ make_config! {
     /// SSO settings
     sso {
         /// Enabled
-        sso_enabled:         bool,   true,   def,     true;
+        sso_enabled:            bool,   true,   def,    false;
+        /// Force SSO login
+        sso_only:               bool,   true,   def,    false;
         /// Client ID
-        sso_client_id:       String, true,   def,   String::new();
+        sso_client_id:          String, true,   def,    String::new();
         /// Client Key
-        sso_client_secret:      Pass,   true,  def,   String::new();
+        sso_client_secret:      Pass,   true,   def,    String::new();
         /// Authority Server
-        sso_authority:          String, true,   def,   String::new();
+        sso_authority:          String, true,   def,    String::new();
         /// CallBack Path
-        sso_callback_path:      String, false,   gen,  |c| generate_sso_callback_path(&c.domain);
+        sso_callback_path:      String, false,  gen,    |c| generate_sso_callback_path(&c.domain);
     },
 
     /// Yubikey settings

@@ -52,7 +52,8 @@ pub fn routes() -> Vec<Route> {
         organizations_overview,
         delete_organization,
         diagnostics,
-        get_diagnostics_config
+        get_diagnostics_config,
+        post_sso_settings
     ]
 }
 
@@ -486,8 +487,16 @@ async fn organizations_overview(_token: AdminToken, mut conn: DbConn) -> ApiResu
         org["attachment_size"] = json!(get_display_size(Attachment::size_by_org(&o.uuid, &mut conn).await as i32));
         organizations_json.push(org);
     }
+    let sso_config = match SsoSettings::get(&mut conn).await {
+        Some(s) => s,
+        None => SsoSettings::new(),
+    }.to_json();
+    let organizations_data = json!({
+        "organizations": organizations_json,
+        "sso_config": sso_config
+    });
 
-    let text = AdminTemplateData::new("admin/organizations", json!(organizations_json)).render()?;
+    let text = AdminTemplateData::new("admin/organizations", organizations_data).render()?;
     Ok(Html(text))
 }
 
@@ -662,6 +671,40 @@ async fn backup_db(_token: AdminToken, mut conn: DbConn) -> EmptyResult {
     } else {
         err!("Can't back up current DB (Only SQLite supports this feature)");
     }
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+struct SsoSettingsData {
+    sso_enabled: bool,
+    sso_force: bool,
+    sso_client_id: Option<String>,
+    sso_client_secret: Option<String>,
+    sso_authority: Option<String>
+}
+
+#[post("/sso_settings", data = "<data>")]
+async fn post_sso_settings(data: Json<SsoSettingsData>, _token: AdminToken, mut conn: DbConn) -> EmptyResult {
+    let data: SsoSettingsData = data.into_inner();
+    let sso_settings = SsoSettings::from_data(
+        data.sso_enabled,
+        data.sso_force,
+        data.sso_client_id.unwrap_or_default(),
+        data.sso_client_secret.unwrap_or_default(),
+        data.sso_authority.unwrap_or_default()
+    );
+    if sso_settings.enabled {
+        if sso_settings.client_id.is_empty() {
+            err!("Client ID is empty!");
+        }
+        if sso_settings.client_secret.is_empty() {
+            err!("Client secret is empty!");
+        }
+        if sso_settings.authority.is_empty() {
+            err!("Authority is empty!");
+        }
+    }
+    sso_settings.save(&mut conn).await
 }
 
 pub struct AdminToken {}

@@ -13,7 +13,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {{#each page_data}}
+                    {{#each page_data.organizations}}
                     <tr>
                         <td>
                             <svg width="48" height="48" class="float-start me-2 rounded" data-jdenticon-value="{{Id}}">
@@ -50,6 +50,85 @@
             <button type="button" class="btn btn-sm btn-primary float-end" id="reload">Reload organizations</button>
         </div>
     </div>
+
+    <div id="config-block" class="align-items-center p-3 mb-3 bg-secondary rounded shadow">
+            <div>
+                <h6 class="text-white mb-3">SSO Configuration</h6>
+                <div class="small text-white mb-3">
+                    <span class="font-weight-bolder">NOTE:</span> The settings here override the environment variables. Once saved, it's recommended to stop setting them to avoid confusion.<br>
+                    This does not apply to the read-only section, which can only be set via environment variables.<br>
+                    Settings which are overridden are shown with <span class="is-overridden-true alert-row px-1">a yellow colored background</span>.
+                </div>
+
+                <form class="form needs-validation" id="sso-config-form" novalidate>
+                    <div class="card bg-light mb-3">
+                        <button id="b_sso_settings" type="button" class="card-header text-start btn btn-link text-decoration-none" aria-expanded="true" aria-controls="g_b_sso_settings" data-bs-toggle="collapse" data-bs-target="#g_b_sso_settings">OpenID Connect Settings</button>
+                        <div id="g_b_sso_settings" class="card-body collapse show">
+                            <div class="row my-2 align-items-center alert-row" title="[sso_enabled]">
+                                <div class="col-sm-3 col-form-label">Enabled</div>
+                                <div class="col-sm-8">
+                                    <div class="form-check">
+                                        <input class="form-check-input conf-checkbox" type="checkbox" id="input_sso_enabled"
+                                            name="sso_enabled" {{#if page_data.sso_config.enabled}} checked {{/if}}>
+
+                                        <label class="form-check-label" for="input_sso_enabled">Default: false</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row my-2 align-items-center alert-row" title="[sso_force]">
+                                <div class="col-sm-3 col-form-label">Force</div>
+                                <div class="col-sm-8">
+                                    <div class="form-check">
+                                        <input class="form-check-input conf-checkbox" type="checkbox" id="input_sso_force"
+                                            name="sso_force" {{#if page_data.sso_config.force}} checked {{/if}}>
+
+                                        <label class="form-check-label" for="input_sso_force">Default: false</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row my-2 align-items-center alert-row" title="[sso_client_id]">
+                                <div class="col-sm-3 col-form-label">Client ID</div>
+                                <div class="col-sm-8">
+                                    <div class="input-group">
+                                        <input class="form-control conf-text" type="text" id="input_sso_client_id"
+                                            name="sso_client_id" placeholder="Client ID" value="{{page_data.sso_config.client_id}}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row my-2 align-items-center alert-row" title="[sso_client_secret]">
+                                <div class="col-sm-3 col-form-label">Client Secret</div>
+                                <div class="col-sm-8">
+                                    <div class="input-group">
+                                        <input class="form-control conf-password" type="text" id="input_sso_client_secret"
+                                            name="sso_client_secret" placeholder="Client secret" value="{{page_data.sso_config.client_secret}}">
+                                        <button class="btn btn-outline-secondary input-group-text" type="button" data-vw-pw-toggle="input_sso_client_secret">Show/hide</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row my-2 align-items-center alert-row" title="[sso_authority]">
+                                <div class="col-sm-3 col-form-label">Authority</div>
+                                <div class="col-sm-8">
+                                    <div class="input-group">
+                                        <input class="form-control conf-text" type="text" id="input_sso_authority"
+                                            name="sso_authority" placeholder="Authority" value="{{page_data.sso_config.authority}}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row my-2 align-items-center alert-row" title="[sso_callback_path]">
+                                <div class="col-sm-3 col-form-label">Callback URL</div>
+                                <div class="col-sm-8">
+                                    <div class="input-group">
+                                        <input readonly class="form-control conf-text" type="text" id="input_sso_callback_path"
+                                            name="sso_callback_path" value="{{page_data.sso_config.callback_path}}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </form>
+            </div>
+        </div>
 </main>
 
 <link rel="stylesheet" href="{{urlpath}}/vw_static/datatables.css" />

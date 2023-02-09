@@ -28,8 +28,61 @@ function deleteOrganization() {
     }
 }
 
+function getFormData() {
+    let data = {};
+
+    document.querySelectorAll(".conf-checkbox").forEach(function (e) {
+        data[e.name] = e.checked;
+    });
+
+    document.querySelectorAll(".conf-number").forEach(function (e) {
+        data[e.name] = e.value ? +e.value : null;
+    });
+
+    document.querySelectorAll(".conf-text, .conf-password").forEach(function (e) {
+        data[e.name] = e.value || null;
+    });
+    return data;
+}
+
+// Two functions to help check if there were changes to the form fields
+// Useful for example during the smtp test to prevent people from clicking save before testing there new settings
+function initChangeDetection(form) {
+    const ignore_fields = ["smtp-test-email"];
+    Array.from(form).forEach((el) => {
+        if (! ignore_fields.includes(el.id)) {
+            el.dataset.origValue = el.value;
+        }
+    });
+}
+
+// This function will prevent submitting a from when someone presses enter.
+function preventFormSubmitOnEnter(form) {
+    form.onkeypress = function(e) {
+        const key = e.charCode || e.keyCode || 0;
+        if (key == 13) {
+            e.preventDefault();
+        }
+    };
+}
+
+function saveSsoConfig() {
+    const data = JSON.stringify(getFormData());
+    console.log(data);
+    _post(`${BASE_URL}/admin/sso_settings/`,
+        "Config saved correctly",
+        "Error saving config",
+        data
+    );
+    event.preventDefault();
+}
+
+const sso_config_form = document.getElementById("sso-config-form");
+
 // onLoad events
 document.addEventListener("DOMContentLoaded", (/*event*/) => {
+    initChangeDetection(sso_config_form);
+    preventFormSubmitOnEnter(sso_config_form);
     jQuery("#orgs-table").DataTable({
         "stateSave": true,
         "responsive": true,
@@ -51,4 +104,5 @@ document.addEventListener("DOMContentLoaded", (/*event*/) => {
     });
 
     document.getElementById("reload").addEventListener("click", reload);
+    sso_config_form.addEventListener("submit", saveSsoConfig);
 });

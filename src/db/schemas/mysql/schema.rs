@@ -232,6 +232,17 @@ table! {
 }
 
 table! {
+    sso_settings (id) {
+        id -> Integer,
+        enabled -> Bool,
+        force -> Bool,
+        client_id -> Text,
+        client_secret -> Text,
+        authority -> Text,
+    }
+}
+
+table! {
     emergency_access (uuid) {
         uuid -> Text,
         grantor_uuid -> Text,

@@ -5,6 +5,7 @@ use rocket::serde::json::Json;
 use rocket::{
     form::{Form, FromForm},
     response::Redirect,
+    http::Status,
     Route,
 };
 use serde_json::Value;
@@ -143,7 +144,7 @@ async fn _authorization_login(
     let scope_vec = vec!["api".into(), "offline_access".into()];
     let code = data.code.as_ref().unwrap();
 
-    let (refresh_token, id_token) = match get_auth_code_access_token(code).await {
+    let (refresh_token, id_token) = match get_auth_code_access_token(code, conn).await {
         Ok((refresh_token, id_token)) => (refresh_token, id_token),
         Err(err) => err!(err),
     };
@@ -297,7 +298,8 @@ async fn _password_login(
         )
     }
 
-    if CONFIG.sso_enabled() && CONFIG.sso_only() {
+    let sso_settings = SsoSettings::get(conn).await.unwrap();
+    if sso_settings.enabled && sso_settings.force {
         err!("SSO sign-in is required");
     }
 
@@ -743,11 +745,12 @@ use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,
 };
 
-async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
-    let redirect = CONFIG.sso_callback_path();
-    let client_id = ClientId::new(CONFIG.sso_client_id());
-    let client_secret = ClientSecret::new(CONFIG.sso_client_secret());
-    let issuer_url = IssuerUrl::new(CONFIG.sso_authority()).or(Err("invalid issuer URL"))?;
+async fn get_client_from_sso_config(conn: &mut DbConn) -> Result<CoreClient, &'static str> {
+    let sso_settings = SsoSettings::get(conn).await.unwrap();
+    let redirect = sso_settings.generate_sso_callback_path();
+    let client_id = ClientId::new(sso_settings.client_id);
+    let client_secret = ClientSecret::new(sso_settings.client_secret);
+    let issuer_url = IssuerUrl::new(sso_settings.authority).or(Err("invalid issuer URL"))?;
 
     //TODO: This comparison will fail if one URI has a trailing slash and the other one does not.
     // Should we remove trailing slashes when saving? Or when checking?
@@ -781,7 +784,7 @@ fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect>
 
 #[get("/connect/authorize?<redirect_uri>&<state>")]
 async fn authorize(redirect_uri: String, state: String, mut conn: DbConn) -> ApiResult<Redirect> {
-    match get_client_from_sso_config().await {
+    match get_client_from_sso_config(&mut conn).await {
         Ok(client) => {
             let (mut authorize_url, _csrf_state, nonce) = client
                 .authorize_url(
@@ -811,13 +814,13 @@ async fn authorize(redirect_uri: String, state: String, mut conn: DbConn) -> Api
 
             Ok(Redirect::to(authorize_url.to_string()))
         }
-        Err(err) => err!("Unable to find client from identifier {}", err),
+        Err(err) => err_code!(format!("Unable to find client from identifier {}", err), Status::InternalServerError.code),
     }
 }
 
-async fn get_auth_code_access_token(code: &str) -> Result<(String, String), &'static str> {
+async fn get_auth_code_access_token(code: &str, conn: &mut DbConn) -> Result<(String, String), &'static str> {
     let oidc_code = AuthorizationCode::new(String::from(code));
-    match get_client_from_sso_config().await {
+    match get_client_from_sso_config(conn).await {
         Ok(client) => match client.exchange_code(oidc_code).request_async(async_http_client).await {
             Ok(token_response) => {
                 let refresh_token = token_response.refresh_token().unwrap().secret().to_string();

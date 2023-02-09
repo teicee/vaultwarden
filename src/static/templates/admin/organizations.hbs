@@ -54,11 +54,6 @@
     <div id="config-block" class="align-items-center p-3 mb-3 bg-secondary rounded shadow">
             <div>
                 <h6 class="text-white mb-3">SSO Configuration</h6>
-                <div class="small text-white mb-3">
-                    <span class="font-weight-bolder">NOTE:</span> The settings here override the environment variables. Once saved, it's recommended to stop setting them to avoid confusion.<br>
-                    This does not apply to the read-only section, which can only be set via environment variables.<br>
-                    Settings which are overridden are shown with <span class="is-overridden-true alert-row px-1">a yellow colored background</span>.
-                </div>
 
                 <form class="form needs-validation" id="sso-config-form" novalidate>
                     <div class="card bg-light mb-3">
@@ -99,7 +94,7 @@
                                 <div class="col-sm-3 col-form-label">Client Secret</div>
                                 <div class="col-sm-8">
                                     <div class="input-group">
-                                        <input class="form-control conf-password" type="text" id="input_sso_client_secret"
+                                        <input class="form-control conf-password" type="password" id="input_sso_client_secret"
                                             name="sso_client_secret" placeholder="Client secret" value="{{page_data.sso_config.client_secret}}">
                                         <button class="btn btn-outline-secondary input-group-text" type="button" data-vw-pw-toggle="input_sso_client_secret">Show/hide</button>
                                     </div>

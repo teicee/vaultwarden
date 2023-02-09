@@ -77,6 +77,19 @@ function saveSsoConfig() {
     event.preventDefault();
 }
 
+function toggleVis(evt) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const elem = document.getElementById(evt.target.dataset.vwPwToggle);
+    const type = elem.getAttribute("type");
+    if (type === "text") {
+        elem.setAttribute("type", "password");
+    } else {
+        elem.setAttribute("type", "text");
+    }
+}
+
 const sso_config_form = document.getElementById("sso-config-form");
 
 // onLoad events
@@ -101,6 +114,10 @@ document.addEventListener("DOMContentLoaded", (/*event*/) => {
     // Add click events for organization actions
     document.querySelectorAll("button[vw-delete-organization]").forEach(btn => {
         btn.addEventListener("click", deleteOrganization);
+    });
+
+    document.querySelectorAll("button[data-vw-pw-toggle]").forEach(password_toggle_btn => {
+        password_toggle_btn.addEventListener("click", toggleVis);
     });
 
     document.getElementById("reload").addEventListener("click", reload);

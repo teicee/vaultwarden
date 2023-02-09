@@ -153,7 +153,7 @@ impl Organization {
             "UseTotp": true,
             "UsePolicies": true,
             // "UseScim": false, // Not supported (Not AGPLv3 Licensed)
-            "UseSso": CONFIG.sso_enabled(),
+            // "UseSso": false, // managed instance-wide
             // "UseKeyConnector": false, // Not supported
             "SelfHost": true,
             "UseApi": false, // Not supported
@@ -322,7 +322,7 @@ impl UserOrganization {
             "HasPublicAndPrivateKeys": org.private_key.is_some() && org.public_key.is_some(),
             "ResetPasswordEnrolled": false, // Not supported
             "SsoBound": false, // Not supported
-            "UseSso": CONFIG.sso_enabled(),
+            // "UseSso": false, // managed instance-wide
             "ProviderId": null,
             "ProviderName": null,
             // "KeyConnectorEnabled": false,

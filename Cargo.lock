@@ -3407,6 +3407,7 @@ dependencies = [
  "url",
  "uuid",
  "webauthn-rs",
+ "which",
  "yubico",
 ]
 
@@ -3561,12 +3562,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "webpki-roots"
-version = "0.22.6"
+name = "which"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6c71e40d7d2c34a5106301fb632274ca37242cd0c9d3e64dbece371a40a2d87"
+checksum = "2441c784c52b289a054b7201fc93253e288f094e2f4be9058343127c4226a269"
 dependencies = [
- "webpki",
+ "either",
+ "libc",
+ "once_cell",
 ]
 
 [[package]]

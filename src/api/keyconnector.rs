@@ -22,7 +22,9 @@ fn get_userkeys(headers: Headers) -> JsonResult {
             "Key": crypto::encodebase64(user.akey),
          })))
     } else {
-        err_code!("User doesn't exist", Status::NotFound.code);
+        Ok(Json(json!({
+            "Key":null,
+         })))
     }
 }
 

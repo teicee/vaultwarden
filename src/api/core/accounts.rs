@@ -28,6 +28,7 @@ pub fn routes() -> Vec<rocket::Route> {
         post_keys,
         post_password,
         post_set_password,
+        post_set_key_connector_key,
         post_kdf,
         post_rotatekey,
         post_sstamp,
@@ -84,6 +85,17 @@ pub struct SetPasswordData {
     Keys: Option<KeysData>,
     MasterPasswordHash: String,
     MasterPasswordHint: Option<String>,
+    #[allow(dead_code)]
+    orgIdentifier: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct SetKeyConnectorData {
+    Kdf: Option<i32>,
+    KdfIterations: Option<i32>,
+    Key: String,
+    Keys: Option<KeysData>,
     #[allow(dead_code)]
     orgIdentifier: Option<String>,
 }
@@ -212,6 +224,8 @@ pub async fn _register(data: JsonUpcase<RegisterData>, mut conn: DbConn) -> Json
         user.private_key = Some(keys.EncryptedPrivateKey);
         user.public_key = Some(keys.PublicKey);
     }
+    
+    user.uses_key_connector = false;
 
     if CONFIG.mail_enabled() {
         if CONFIG.signups_verify() && !verified_by_invite {
@@ -273,6 +287,33 @@ async fn post_set_password(data: JsonUpcase<SetPasswordData>, headers: Headers, 
     Ok(Json(json!({
       "Object": "set-password",
       "CaptchaBypassToken": "",
+    })))
+}
+
+#[post("/accounts/set-key-connector-key", data = "<data>")]
+async fn post_set_key_connector_key(data: JsonUpcase<SetKeyConnectorData>, headers: Headers, mut conn: DbConn) -> JsonResult {
+    let data: SetKeyConnectorData = data.into_inner().data;
+    let mut user = headers.user;
+
+    if let Some(client_kdf_iter) = data.KdfIterations {
+        user.client_kdf_iter = client_kdf_iter;
+    }
+
+    if let Some(client_kdf_type) = data.Kdf {
+        user.client_kdf_type = client_kdf_type;
+    }
+    
+    user.akey = data.Key;
+
+
+    if let Some(keys) = data.Keys {
+        user.private_key = Some(keys.EncryptedPrivateKey);
+        user.public_key = Some(keys.PublicKey);
+    }
+
+    user.save(&mut conn).await?;
+    Ok(Json(json!({
+      "Object": "set-key-connector-key",
     })))
 }
 

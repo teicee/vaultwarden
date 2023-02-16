@@ -2,7 +2,6 @@
 // PBKDF2 derivation
 //
 use std::num::NonZeroU32;
-
 use data_encoding::{Encoding, HEXLOWER, BASE64};
 use ring::{digest, hmac, pbkdf2};
 
@@ -115,14 +114,13 @@ pub fn ct_eq<T: AsRef<[u8]>, U: AsRef<[u8]>>(a: T, b: U) -> bool {
 
 /// Encode to base64
 pub fn encodebase64(str: String) -> String {
-    let bytes = BASE64::decode(str).unwrap();
-    let str = str::from_utf8(&bytes).unwrap();
-    return str;
+    let encoded = BASE64.encode(str.as_bytes());
+    encoded
 }
 
 /// Encode to base64
 pub fn decodebase64(str: String) -> String {
-    let bytes = BASE64::encode(str).unwrap();
-    let str = str::from_utf8(&bytes).unwrap();
-    return str;
+    let decoded = BASE64.decode(str.as_bytes()).unwrap();
+    let data = String::from_utf8(decoded).expect("Failed to convert bytes to string");
+    data
 }

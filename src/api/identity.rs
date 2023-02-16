@@ -132,6 +132,8 @@ async fn _refresh_login(data: ConnectData, conn: &mut DbConn) -> JsonResult {
         "KdfMemory": user.client_kdf_memory,
         "KdfParallelism": user.client_kdf_parallelism,
         "ResetMasterPassword": false, // TODO: according to official server seems something like: user.password_hash.is_empty(), but would need testing
+        "keyConnectorUrl" :Value::String(CONFIG.sso_keyconnectorurl()),
+        "UsesKeyConnector": user.uses_key_connector,
         "scope": scope,
         "unofficialServer": true,
     });
@@ -197,6 +199,7 @@ async fn _authorization_login(
 
                     if new_user {
                         user.verified_at = Some(Utc::now().naive_utc());
+                        user.uses_key_connector = false;
                         user.save(conn).await?;
                     }
 
@@ -238,18 +241,23 @@ async fn _authorization_login(
                         "token_type": "Bearer",
                         "refresh_token": device.refresh_token,
                         "expires_in": expires_in,
-                        "Key": user.akey,
+                        "Key": null,
                         "PrivateKey": user.private_key,
                         "Kdf": user.client_kdf_type,
                         "KdfIterations": user.client_kdf_iter,
                         "KdfMemory": user.client_kdf_memory,
                         "KdfParallelism": user.client_kdf_parallelism,
                         "ResetMasterPassword": user.password_hash.is_empty(),
-                        // "forcePasswordReset": false,
-                        // "keyConnectorUrl": false
+                        //"forcePasswordReset": false,
+                        //"keyConnectorUrl": false
+                        
                         "scope": scope,
                         "unofficialServer": true,
                     });
+
+                    if !user.akey.is_empty() {
+                        result["Key"] = Value::String(user.akey);
+                    }
 
                     if let Some(token) = twofactor_token {
                         result["TwoFactorToken"] = Value::String(token);
@@ -257,6 +265,7 @@ async fn _authorization_login(
 
                     if CONFIG.sso_keyconnector_enabled() {
                         result["keyConnectorUrl"] = Value::String(CONFIG.sso_keyconnectorurl() );
+                        result["UsesKeyConnector"] = Value::String(user.uses_key_connector.to_string());
                     }
 
                     info!("User {} logged in successfully. IP: {}", user.email, ip.ip);
@@ -512,7 +521,6 @@ async fn _user_api_key_login(
         "token_type": "Bearer",
         "Key": user.akey,
         "PrivateKey": user.private_key,
-
         "Kdf": user.client_kdf_type,
         "KdfIterations": user.client_kdf_iter,
         "KdfMemory": user.client_kdf_memory,

@@ -93,7 +93,6 @@ pub fn routes() -> Vec<Route> {
         put_reset_password,
         get_org_export,
         get_auto_enroll_status,
-
     ]
 }
 

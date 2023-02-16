@@ -326,6 +326,7 @@ joinable!(groups_users -> groups (groups_uuid));
 joinable!(collections_groups -> collections (collections_uuid));
 joinable!(collections_groups -> groups (groups_uuid));
 joinable!(event -> users_organizations (uuid));
+joinable!(keyconnector -> users (user_uuid));
 
 allow_tables_to_appear_in_same_query!(
     attachments,

@@ -809,7 +809,7 @@ fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect>
         }
     }
 
-    Ok(Redirect::to(format!("{}?code={}&state={}", redirect_uri, code, oldstate)))
+    Ok(Redirect::to(format!("{redirect_uri}?code={code}&state={oldstate}")))
 }
 
 #[get("/connect/authorize?<redirect_uri>&<state>")]
@@ -835,9 +835,9 @@ async fn authorize(redirect_uri: String, state: String, mut conn: DbConn) -> Api
             let new_pairs = old_pairs.map(|pair| {
                 let (key, value) = pair;
                 if key == "state" {
-                    return format!("{}={}_redirecturl={}", key, state, redirect_uri);
+                    return format!("{key}={state}_redirecturl={redirect_uri}");
                 }
-                format!("{}={}", key, value)
+                format!("{key}={value}")
             });
             let full_query = Vec::from_iter(new_pairs).join("&");
             authorize_url.set_query(Some(full_query.as_str()));

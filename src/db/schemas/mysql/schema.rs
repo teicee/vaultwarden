@@ -213,7 +213,7 @@ table! {
     keyconnector (uuid, user_uuid) {
         uuid -> Text,
         user_uuid -> Text,
-        key -> Text,
+        secretkey -> Text,
     }
 }
 

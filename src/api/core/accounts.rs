@@ -304,12 +304,14 @@ async fn post_set_key_connector_key(data: JsonUpcase<SetKeyConnectorData>, heade
     }
     
     user.akey = data.Key;
-
+    user.uses_key_connector = true;
 
     if let Some(keys) = data.Keys {
         user.private_key = Some(keys.EncryptedPrivateKey);
         user.public_key = Some(keys.PublicKey);
     }
+
+    log_user_event(EventType::UserMigratedKeyToKeyConnector as i32, &user.uuid, headers.device.atype, &headers.ip.ip, &mut conn).await;
 
     user.save(&mut conn).await?;
     Ok(Json(json!({

@@ -133,7 +133,7 @@ async fn _refresh_login(data: ConnectData, conn: &mut DbConn) -> JsonResult {
         "KdfParallelism": user.client_kdf_parallelism,
         "ResetMasterPassword": false, // TODO: according to official server seems something like: user.password_hash.is_empty(), but would need testing
         "keyConnectorUrl" :Value::String(CONFIG.sso_keyconnectorurl()),
-        "UsesKeyConnector": user.uses_key_connector,
+        "usesKeyConnector": user.uses_key_connector,
         "scope": scope,
         "unofficialServer": true,
     });
@@ -177,6 +177,7 @@ async fn _authorization_login(
     // let expiry = token.exp;
     let nonce = token.nonce;
     let mut new_user = false;
+    let mut sso_keyconnector_key = "".to_string();
 
     match SsoNonce::find(&nonce, conn).await {
         Some(sso_nonce) => {
@@ -250,22 +251,29 @@ async fn _authorization_login(
                         "ResetMasterPassword": user.password_hash.is_empty(),
                         //"forcePasswordReset": false,
                         //"keyConnectorUrl": false
-                        
                         "scope": scope,
                         "unofficialServer": true,
                     });
 
-                    if !user.akey.is_empty() {
-                        result["Key"] = Value::String(user.akey);
-                    }
-
                     if let Some(token) = twofactor_token {
                         result["TwoFactorToken"] = Value::String(token);
                     }
-
                     if CONFIG.sso_keyconnector_enabled() {
                         result["keyConnectorUrl"] = Value::String(CONFIG.sso_keyconnectorurl() );
-                        result["UsesKeyConnector"] = Value::String(user.uses_key_connector.to_string());
+                        result["usesKeyConnector"] = Value::String(user.uses_key_connector.to_string());
+                        match SsoKeyConnector::find_by_userid(&user.uuid, conn).await {
+                            Some(keyconnector) => {
+                                sso_keyconnector_key =  keyconnector.secretkey;
+                            } 
+                            None => {
+                                sso_keyconnector_key = "".to_string();
+                            }
+                        };
+                        
+                    }
+
+                    if !user.akey.is_empty() && !sso_keyconnector_key.is_empty() {
+                        result["Key"] = Value::String(user.akey);
                     }
 
                     info!("User {} logged in successfully. IP: {}", user.email, ip.ip);

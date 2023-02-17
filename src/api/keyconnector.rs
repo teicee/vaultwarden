@@ -1,45 +1,54 @@
 use rocket::serde::json::Json;
-use rocket::{
-    http::Status,
-    Route,
-};
+use rocket::Route;
 use crate::{
-    api::JsonResult,
+    api::{JsonResult,EmptyResult, JsonUpcase},
     auth::Headers,
-    crypto,
+    db::{models::*, DbConn},
 };
 
 
 pub fn routes() -> Vec<Route> {
-    routes![get_userkeys, put_userkeys, post_userkeys]
+    routes![get_userkeys, post_userkeys]
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct KeyConnectorData {
+    Key: String,
 }
 
 #[get("/user-keys")]
-fn get_userkeys(headers: Headers) -> JsonResult {
+async fn get_userkeys(headers: Headers, conn: DbConn) -> JsonResult {
     let user = headers.user;
-    if !user.akey.is_empty() {
-        Ok(Json(json!({
-            "Key": crypto::encodebase64(user.akey),
-         })))
-    } else {
-        Ok(Json(json!({
-            "Key":null,
-         })))
+    match SsoKeyConnector::find_by_userid(&user.uuid, &conn).await {
+        Some(keyconnector_key) => {
+            Ok(Json(json!({
+                "Key": keyconnector_key.secretkey,
+             })))
+        }
+        None => {
+            Ok(Json(json!({
+                "Key":null,
+             })))
+        }
     }
 }
 
-#[put("/user-keys")]
-fn put_userkeys(headers: Headers) -> JsonResult {
+#[post("/user-keys", data = "<data>")]
+async fn post_userkeys(data: JsonUpcase<KeyConnectorData>, headers: Headers, mut conn: DbConn) -> EmptyResult {
     let user = headers.user;
-    Ok(Json(json!({
-        "Key": user.akey,
-    })))
-}
+    let user_uuid = user.uuid;
+    let data: KeyConnectorData = data.into_inner().data;
 
-#[post("/user-keys")]
-fn post_userkeys(headers: Headers) -> JsonResult {
-    let user = headers.user;
-    Ok(Json(json!({
-        "Key": user.akey,
-    })))
+    let mut keyconnector = match SsoKeyConnector::find_by_userid(&user_uuid, &mut conn).await {
+        Some(keyconnector) => keyconnector,
+        None => {
+            SsoKeyConnector::new(user_uuid)
+        }
+    };
+
+    keyconnector.secretkey=data.Key;
+    keyconnector.save(&mut conn).await?;
+
+    Ok(())
 }

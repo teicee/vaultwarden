@@ -2,7 +2,7 @@
 // PBKDF2 derivation
 //
 use std::num::NonZeroU32;
-use data_encoding::{Encoding, HEXLOWER, BASE64};
+use data_encoding::{Encoding, HEXLOWER};
 use ring::{digest, hmac, pbkdf2};
 
 static DIGEST_ALG: pbkdf2::Algorithm = pbkdf2::PBKDF2_HMAC_SHA256;
@@ -110,17 +110,4 @@ pub fn ct_eq<T: AsRef<[u8]>, U: AsRef<[u8]>>(a: T, b: U) -> bool {
     use ring::constant_time::verify_slices_are_equal;
 
     verify_slices_are_equal(a.as_ref(), b.as_ref()).is_ok()
-}
-
-/// Encode to base64
-pub fn encodebase64(str: String) -> String {
-    let encoded = BASE64.encode(str.as_bytes());
-    encoded
-}
-
-/// Encode to base64
-pub fn decodebase64(str: String) -> String {
-    let decoded = BASE64.decode(str.as_bytes()).unwrap();
-    let data = String::from_utf8(decoded).expect("Failed to convert bytes to string");
-    data
 }

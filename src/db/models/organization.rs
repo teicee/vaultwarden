@@ -360,7 +360,7 @@ impl UserOrganization {
             "ProviderName": null,
             "KeyConnectorEnabled": CONFIG.sso_keyconnector_enabled(),
             "KeyConnectorUrl": CONFIG.sso_keyconnectorurl(),
-
+            
             // TODO: Add support for Custom User Roles
             // See: https://bitwarden.com/help/article/user-types-access-control/#custom-role
             // "Permissions": {

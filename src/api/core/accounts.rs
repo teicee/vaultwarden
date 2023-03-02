@@ -904,6 +904,8 @@ async fn _api_key(
     headers: Headers,
     mut conn: DbConn,
 ) -> JsonResult {
+    use crate::util::format_date;
+
     let data: SecretVerificationRequest = data.into_inner().data;
     let mut user = headers.user;
 
@@ -918,6 +920,7 @@ async fn _api_key(
 
     Ok(Json(json!({
       "ApiKey": user.api_key,
+      "RevisionDate": format_date(&user.updated_at),
       "Object": "apiKey",
     })))
 }

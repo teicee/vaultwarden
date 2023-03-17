@@ -67,7 +67,7 @@ async fn login(data: Form<ConnectData>, client_header: ClientHeaders, mut conn: 
             _check_is_some(&data.device_identifier, "device_identifier cannot be blank")?;
             _check_is_some(&data.device_name, "device_name cannot be blank")?;
             _check_is_some(&data.device_type, "device_type cannot be blank")?;
-            _authorization_login(data, &mut user_uuid, &mut conn, &ip).await
+            _authorization_login(data, &mut user_uuid, &mut conn, &client_header.ip).await
         }
         t => err!("Invalid type", t),
     };

@@ -6,6 +6,7 @@ use rocket::{
     form::{Form, FromForm},
     response::Redirect,
     Route,
+    http::CookieJar,
 };
 use serde_json::Value;
 
@@ -16,10 +17,11 @@ use crate::{
         core::two_factor::{duo, email, email::EmailTokenData, yubikey},
         ApiResult, EmptyResult, JsonResult, JsonUpcase,
     },
-    auth::{ClientHeaders, ClientIp},
+    auth::{ClientHeaders, ClientIp, encode_jwt, generate_sso_claims, generate_ssotoken_claims},
     db::{models::*, DbConn},
     error::MapResult,
     mail, util, CONFIG,
+    util::{CustomRedirect,CookieManager},
 };
 
 pub fn routes() -> Vec<Route> {
@@ -172,8 +174,8 @@ async fn _authorization_login(
     validation.insecure_disable_signature_validation();
 
     let token = jsonwebtoken::decode::<TokenPayload>(id_token.as_str(), &DecodingKey::from_secret(&[]), &validation)
-        .unwrap()
-        .claims;
+    .unwrap()
+    .claims;
 
     // let expiry = token.exp;
     let nonce = token.nonce;
@@ -772,19 +774,33 @@ fn _check_is_some<T>(value: &Option<T>, msg: &str) -> EmptyResult {
     Ok(())
 }
 
-#[get("/account/prevalidate")]
+#[get("/account/prevalidate?<domainHint>")]
 #[allow(non_snake_case)]
-fn prevalidate() -> JsonResult {
-    Ok(Json(json!({
-        "token": "",
-    })))
+async fn prevalidate(domainHint: String,mut conn: DbConn) -> JsonResult {
+    match Organization::find_by_identifier(&domainHint,&mut  conn).await {
+        Some(org) => {
+            let claims = generate_ssotoken_claims(
+                String::from(org.uuid),
+                String::from(domainHint),
+            );
+            let ssotoken = encode_jwt(&claims);
+            Ok(Json(json!({
+                "token": ssotoken,
+            })))
+        },
+        None => {
+            Ok(Json(json!({
+                "token": "",
+            })))
+        }
+    }
 }
 
 use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
 use openidconnect::reqwest::async_http_client;
 use openidconnect::OAuth2TokenResponse;
 use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope, RefreshToken,
 };
 
 async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
@@ -808,26 +824,72 @@ async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
     Ok(client)
 }
 
-#[get("/connect/oidc-signin?<code>&<state>")]
-fn oidcsignin(code: String, state: String, _conn: DbConn) -> ApiResult<Redirect> {
-    //TODO this needs to be cleaned up, there should be a better way to do this.
-    let mut redirect_uri: &str = "";
-    let split: Vec<_> = state.split('_').collect();
-    let oldstate = String::new() + split[0] + "_" + split[1];
-    for x in split {
-        if x.contains("redirecturl") {
-            redirect_uri = x.split('=').nth(1).unwrap();
-        }
-    }
+#[get("/connect/oidc-signin?<code>")]
+async fn oidcsignin(
+        code: String,
+        jar: &CookieJar<'_>,
+        mut conn: DbConn
+    ) -> ApiResult<CustomRedirect> {
+    
+    let cookiemanager = CookieManager::new(jar);
 
-    Ok(Redirect::to(format!("{redirect_uri}?code={code}&state={oldstate}")))
+    let redirect_uri =  cookiemanager.get_cookie("redirect_uri".to_string()).unwrap().to_string();      
+    let orig_state =  cookiemanager.get_cookie("state".to_string()).unwrap().to_string();     
+
+    cookiemanager.delete_cookie("redirect_uri".to_string());
+    cookiemanager.delete_cookie("state".to_string());
+    
+    let redirect = CustomRedirect {
+         url: format!("{redirect_uri}?code={code}&state={orig_state}"),
+         headers: vec![]
+    };
+    
+    Ok(redirect)
+    //Ok(Redirect::to(format!("{redirect_uri}?code={code}&state={orig_state}")))
 }
 
-#[get("/connect/authorize?<redirect_uri>&<state>")]
-async fn authorize(redirect_uri: String, state: String, mut conn: DbConn) -> ApiResult<Redirect> {
+#[derive(FromForm)]
+#[allow(non_snake_case)]
+struct AuthorizeData {
+    #[allow(unused)]
+    #[field(name = uncased("client_id"))]
+    #[field(name = uncased("clientid"))]
+    client_id: Option<String>, 
+    #[field(name = uncased("redirect_uri"))]
+    #[field(name = uncased("redirecturi"))]
+    redirect_uri: Option<String>,
+    #[allow(unused)]
+    #[field(name = uncased("response_type"))]
+    #[field(name = uncased("responsetype"))]
+    response_type: Option<String>, 
+    #[allow(unused)]
+    #[field(name = uncased("scope"))]
+    scope: Option<String>,
+    #[field(name = uncased("state"))]
+    state: Option<String>,
+    #[allow(unused)]
+    #[field(name = uncased("code_challenge"))]
+    code_challenge: Option<String>,
+    #[allow(unused)]
+    #[field(name = uncased("code_challenge_method"))]
+    code_challenge_method: Option<String>,
+    #[allow(unused)]
+    #[field(name = uncased("response_mode"))]
+    response_mode: Option<String>,
+    #[allow(unused)]
+    #[field(name = uncased("domain_hint"))]
+    domain_hint: Option<String>,
+    #[allow(unused)]
+    #[field(name = uncased("ssoToken"))]
+    ssoToken: Option<String>,
+}
+
+#[get("/connect/authorize?<data..>")]
+async fn authorize(data: AuthorizeData, jar: &CookieJar<'_>, mut conn: DbConn) -> ApiResult<CustomRedirect> {
+    let cookiemanager = CookieManager::new(jar);
     match get_client_from_sso_config().await {
         Ok(client) => {
-            let (mut authorize_url, _csrf_state, nonce) = client
+            let (auth_url, _csrf_state, nonce) = client
                 .authorize_url(
                     AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
                     CsrfToken::new_random,
@@ -837,24 +899,19 @@ async fn authorize(redirect_uri: String, state: String, mut conn: DbConn) -> Api
                 .add_scope(Scope::new("profile".to_string()))
                 .url();
 
-            let sso_nonce = SsoNonce::new(nonce.secret().to_string());
-            sso_nonce.save(&mut conn).await?;
+                let sso_nonce = SsoNonce::new(nonce.secret().to_string());
+                sso_nonce.save(&mut conn).await?;
 
-            // it seems impossible to set the state going in dynamically (requires static lifetime string)
-            // so I change it after the fact
-            let old_pairs = authorize_url.query_pairs();
-            let new_pairs = old_pairs.map(|pair| {
-                let (key, value) = pair;
-                if key == "state" {
-                    return format!("{key}={state}_redirecturl={redirect_uri}");
-                }
-                format!("{key}={value}")
-            });
-            let full_query = Vec::from_iter(new_pairs).join("&");
-            authorize_url.set_query(Some(full_query.as_str()));
-
-            Ok(Redirect::to(authorize_url.to_string()))
-        }
+                cookiemanager.set_cookie("redirect_uri".to_string(), data.redirect_uri.unwrap().to_string());
+                cookiemanager.set_cookie("state".to_string(), data.state.unwrap().to_string());
+            
+                let redirect = CustomRedirect {
+                    url: format!("{}", auth_url.to_string()),
+                    headers: vec![]
+               };
+               
+               Ok(redirect)
+        }            
         Err(err) => err!("Unable to find client from identifier {}", err),
     }
 }
@@ -864,10 +921,29 @@ async fn get_auth_code_access_token(code: &str) -> Result<(String, String), &'st
     match get_client_from_sso_config().await {
         Ok(client) => match client.exchange_code(oidc_code).request_async(async_http_client).await {
             Ok(token_response) => {
-                let refresh_token = token_response.refresh_token().unwrap().secret().to_string();
+                //let refresh_token = token_response.refresh_token():
+                let refresh_token: Option<String> = Some(token_response.refresh_token().unwrap().secret().to_string());
+                let refreshtoken = match refresh_token {
+                    Some(token) => token,
+                    None => "".to_string(),
+                };
                 let id_token = token_response.extra_fields().id_token().unwrap().to_string();
-                Ok((refresh_token, id_token))
-            }
+                Ok((refreshtoken.to_string(), id_token))
+            },
+            Err(_err) => Err("Failed to contact token endpoint"),
+        },
+        Err(_err) => Err("unable to find client"),
+    }
+}
+
+async fn get_new_access_token(token: &str) -> Result<String, &'static str> {
+    let refresh_token = RefreshToken::new(String::from(token));
+    match get_client_from_sso_config().await {
+        Ok(client) => match client.exchange_refresh_token(&refresh_token).request_async(async_http_client).await {
+            Ok(token_response) => {
+                let access_token =  token_response.access_token().secret().to_string();
+                Ok(access_token.to_string())
+            },
             Err(_err) => Err("Failed to contact token endpoint"),
         },
         Err(_err) => Err("unable to find client"),

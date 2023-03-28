@@ -221,10 +221,9 @@ async fn _authorization_login(
                         }
                     }
 
-                    //Work around due to normal accept call not firing, disabled by default
                     if CONFIG.sso_acceptall_invites() {
                         for mut user_org in UserOrganization::find_invited_by_user(&user.uuid, conn).await.iter_mut() {
-                            user_org.status = UserOrgStatus::Accepted as i32;
+                            user_org.status = UserOrgStatus::Confirmed as i32;
                             user_org.save(conn).await?;
                         }
                     }

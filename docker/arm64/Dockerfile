@@ -2,7 +2,6 @@
 
 # This file was generated using a Jinja2 template.
 # Please make your changes in `Dockerfile.j2` and then `make` the individual Dockerfiles.
-
 # Using multistage build:
 # 	https://docs.docker.com/develop/develop-images/multistage-build/
 # 	https://whitfin.io/speeding-up-rust-docker-builds/
@@ -16,18 +15,18 @@
 # - From https://hub.docker.com/r/vaultwarden/web-vault/tags,
 #   click the tag name to view the digest of the image it currently points to.
 # - From the command line:
-#     $ docker pull vaultwarden/web-vault:v2023.2.0
-#     $ docker image inspect --format "{{.RepoDigests}}" vaultwarden/web-vault:v2023.2.0
-#     [vaultwarden/web-vault@sha256:92896085c7ba4f81e210b70d0b978b100cadd4207c2b2531116f8575b85b3345]
+#     $ docker pull vaultwarden/web-vault:v2023.3.0b
+#     $ docker image inspect --format "{{.RepoDigests}}" vaultwarden/web-vault:v2023.3.0b
+#     [vaultwarden/web-vault@sha256:aa6ba791911a815ea570ec2ddc59992481c6ba8fbb65eed4f7074b463430d3ee]
 #
 # - Conversely, to get the tag name from the digest:
-#     $ docker image inspect --format "{{.RepoTags}}" vaultwarden/web-vault@sha256:92896085c7ba4f81e210b70d0b978b100cadd4207c2b2531116f8575b85b3345
-#     [vaultwarden/web-vault:v2023.2.0]
+#     $ docker image inspect --format "{{.RepoTags}}" vaultwarden/web-vault@sha256:aa6ba791911a815ea570ec2ddc59992481c6ba8fbb65eed4f7074b463430d3ee
+#     [vaultwarden/web-vault:v2023.3.0b]
 #
-FROM vaultwarden/web-vault@sha256:92896085c7ba4f81e210b70d0b978b100cadd4207c2b2531116f8575b85b3345 as vault
+FROM vaultwarden/web-vault@sha256:aa6ba791911a815ea570ec2ddc59992481c6ba8fbb65eed4f7074b463430d3ee as vault
 
 ########################## BUILD IMAGE  ##########################
-FROM rust:1.67.1-bullseye as build
+FROM rust:1.68.2-bullseye as build
 
 # Build time options to avoid dpkg warnings and help with reproducible builds.
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -48,7 +47,6 @@ RUN dpkg --add-architecture arm64 \
         --no-install-recommends \
         gcc-aarch64-linux-gnu \
         libc6-dev:arm64 \
-        libcap2-bin \
         libmariadb-dev:arm64 \
         libmariadb-dev-compat:arm64 \
         libmariadb3:arm64 \
@@ -97,7 +95,6 @@ RUN touch src/main.rs
 # Builds again, this time it'll just be
 # your actual source files being built
 RUN cargo build --features ${DB} --release --target=aarch64-unknown-linux-gnu
-
 
 ######################## RUNTIME IMAGE  ########################
 # Create a new stage with a minimal image

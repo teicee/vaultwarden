@@ -98,10 +98,6 @@ pub fn decode_send(token: &str) -> Result<BasicJwtClaims, Error> {
     decode_jwt(token, JWT_SEND_ISSUER.to_string())
 }
 
-pub fn decode_sso(token: &str) -> Result<BasicJwtClaims, Error> {
-    decode_jwt(token, JWT_SSO_ISSUER.to_string())
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginJwtClaims {
     // Not before

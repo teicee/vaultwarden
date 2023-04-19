@@ -4,7 +4,6 @@ use num_traits::FromPrimitive;
 use rocket::serde::json::Json;
 use rocket::{
     form::{Form, FromForm},
-    response::Redirect,
     Route,
     http::CookieJar,
 };
@@ -17,7 +16,7 @@ use crate::{
         core::two_factor::{duo, email, email::EmailTokenData, yubikey},
         ApiResult, EmptyResult, JsonResult, JsonUpcase,
     },
-    auth::{ClientHeaders, ClientIp, encode_jwt, generate_sso_claims, generate_ssotoken_claims},
+    auth::{ClientHeaders, ClientIp, encode_jwt, generate_ssotoken_claims},
     db::{models::*, DbConn},
     error::MapResult,
     mail, util, CONFIG,
@@ -827,7 +826,7 @@ async fn get_client_from_sso_config() -> Result<CoreClient, &'static str> {
 async fn oidcsignin(
         code: String,
         jar: &CookieJar<'_>,
-        mut conn: DbConn
+        _conn: DbConn
     ) -> ApiResult<CustomRedirect> {
     
     let cookiemanager = CookieManager::new(jar);
@@ -844,7 +843,6 @@ async fn oidcsignin(
     };
     
     Ok(redirect)
-    //Ok(Redirect::to(format!("{redirect_uri}?code={code}&state={orig_state}")))
 }
 
 #[derive(FromForm)]

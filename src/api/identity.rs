@@ -917,17 +917,3 @@ async fn get_auth_code_access_token(code: &str) -> Result<(String, String), &'st
         Err(_err) => Err("unable to find client"),
     }
 }
-
-async fn get_new_access_token(token: &str) -> Result<String, &'static str> {
-    let refresh_token = RefreshToken::new(String::from(token));
-    match get_client_from_sso_config().await {
-        Ok(client) => match client.exchange_refresh_token(&refresh_token).request_async(async_http_client).await {
-            Ok(token_response) => {
-                let access_token =  token_response.access_token().secret().to_string();
-                Ok(access_token.to_string())
-            },
-            Err(_err) => Err("Failed to contact token endpoint"),
-        },
-        Err(_err) => Err("unable to find client"),
-    }
-}

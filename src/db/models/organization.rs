@@ -724,6 +724,7 @@ impl UserOrganization {
                 )
             )
             .select(users_organizations::all_columns)
+            .distinct()
             .load::<UserOrganizationDb>(conn).expect("Error loading user organizations").from_db()
         }}
     }

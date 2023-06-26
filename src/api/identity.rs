@@ -261,6 +261,7 @@ async fn _authorization_login(
                     if CONFIG.sso_keyconnector_enabled() {
                         result["keyConnectorUrl"] = Value::String(CONFIG.sso_keyconnectorurl() );
                         result["usesKeyConnector"] = Value::String(user.uses_key_connector.to_string());
+                        result["ResetMasterPassword"] = Value::Bool(false);
                         match SsoKeyConnector::find_by_userid(&user.uuid, conn).await {
                             Some(keyconnector) => {
                                 sso_keyconnector_key =  keyconnector.secretkey;

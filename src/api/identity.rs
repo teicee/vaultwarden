@@ -162,8 +162,8 @@ async fn _authorization_login(
     let scope_vec = vec!["api".into(), "offline_access".into()];
     let code = data.code.as_ref().unwrap();
 
-    let (refresh_token, id_token, userinfo) = match get_auth_code_access_token(code).await {
-        Ok((refresh_token, id_token, userinfo)) => (refresh_token, id_token, userinfo),
+    let (refresh_token, id_token) = match get_auth_code_access_token(code).await {
+        Ok((refresh_token, id_token)) => (refresh_token, id_token),
         Err(err) => err!(err),
     };
 
@@ -186,7 +186,7 @@ async fn _authorization_login(
                     // let expiry = token.exp;
                     let user_email = match token.email {
                         Some(email) => email,
-                        None => userinfo.email().unwrap().to_owned().to_string(),
+                        None => err!("email claim is required in OIDC response"),
                     };
                     let now = Utc::now().naive_utc();
 
@@ -839,9 +839,8 @@ async fn prevalidate(domainHint: String, conn: DbConn) -> JsonResult {
     }
 }
 
-use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType, CoreUserInfoClaims};
+use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
 use openidconnect::reqwest::async_http_client;
-use openidconnect::reqwest::http_client;
 use openidconnect::OAuth2TokenResponse;
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,
@@ -954,7 +953,7 @@ async fn authorize(data: AuthorizeData, jar: &CookieJar<'_>, mut conn: DbConn) -
     }
 }
 
-async fn get_auth_code_access_token(code: &str) -> Result<(String, String, CoreUserInfoClaims), &'static str> {
+async fn get_auth_code_access_token(code: &str) -> Result<(String, String), &'static str> {
     let oidc_code = AuthorizationCode::new(String::from(code));
     match get_client_from_sso_config().await {
         Ok(client) => match client.exchange_code(oidc_code).request_async(async_http_client).await {
@@ -966,13 +965,7 @@ async fn get_auth_code_access_token(code: &str) -> Result<(String, String, CoreU
                 };
                 let id_token = token_response.extra_fields().id_token().unwrap().to_string();
 
-                let userinfo: CoreUserInfoClaims = client
-                    .user_info(token_response.access_token().to_owned(), None)
-                    .unwrap()
-                    .request(http_client)
-                    .unwrap();
-
-                Ok((refreshtoken, id_token, userinfo))
+                Ok((refreshtoken, id_token))
             }
             Err(_err) => Err("Failed to contact token endpoint"),
         },

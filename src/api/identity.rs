@@ -100,7 +100,6 @@ async fn login(data: Form<ConnectData>, client_header: ClientHeaders, mut conn: 
             }
         }
     }
-
     login_result
 }
 
@@ -132,7 +131,10 @@ async fn _refresh_login(data: ConnectData, conn: &mut DbConn) -> JsonResult {
         "KdfMemory": user.client_kdf_memory,
         "KdfParallelism": user.client_kdf_parallelism,
         "ResetMasterPassword": false, // TODO: according to official server seems something like: user.password_hash.is_empty(), but would need testing
-        "keyConnectorUrl" :Value::String(CONFIG.sso_keyconnectorurl()),
+        "keyConnectorUrl" : match CONFIG.sso_keyconnector_enabled() {
+            true => Value::String(CONFIG.sso_keyconnectorurl()),
+            false => Value::Bool(false)
+        },
         "usesKeyConnector": user.uses_key_connector,
         "scope": scope,
         "unofficialServer": true,
@@ -258,19 +260,19 @@ async fn _authorization_login(
                     if let Some(token) = twofactor_token {
                         result["TwoFactorToken"] = Value::String(token);
                     }
-                    if CONFIG.sso_keyconnector_enabled() {
-                        result["keyConnectorUrl"] = Value::String(CONFIG.sso_keyconnectorurl() );
-                        result["usesKeyConnector"] = Value::String(user.uses_key_connector.to_string());
-                        result["ResetMasterPassword"] = Value::Bool(false);
+                    if CONFIG.sso_keyconnector_enabled() && CONFIG.sso_keyconnector_enabled() {
+                        if user.uses_key_connector {
+                            result["keyConnectorUrl"] = Value::String(CONFIG.sso_keyconnectorurl());
+                            result["usesKeyConnector"] = Value::Bool(user.uses_key_connector);
+                        }
                         match SsoKeyConnector::find_by_userid(&user.uuid, conn).await {
                             Some(keyconnector) => {
-                                sso_keyconnector_key =  keyconnector.secretkey;
-                            } 
+                                sso_keyconnector_key = keyconnector.secretkey;
+                            }
                             None => {
                                 sso_keyconnector_key = "".to_string();
                             }
                         };
-                        
                     }
 
                     if !user.akey.is_empty() && !sso_keyconnector_key.is_empty() {

@@ -100,7 +100,7 @@ impl Device {
             sstamp: user.security_stamp.clone(),
             device: self.uuid.clone(),
             scope,
-            amr: vec!["Application".into()],
+            amr: vec!["Application".into(), "external".into()],
         };
 
         (encode_jwt(&claims), DEFAULT_VALIDITY.num_seconds())

@@ -539,7 +539,6 @@ async fn launch_rocket(pool: db::DbPool, extra_debug: bool) -> Result<(), Error>
         .attach(util::BetterLogging(extra_debug))
         .ignite()
         .await?;
-
     CONFIG.set_rocket_shutdown_handle(instance.shutdown());
 
     tokio::spawn(async move {

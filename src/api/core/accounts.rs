@@ -29,6 +29,7 @@ pub fn routes() -> Vec<rocket::Route> {
         post_password,
         post_set_password,
         post_set_key_connector_key,
+        post_convert_to_keyconnector,
         post_kdf,
         post_rotatekey,
         post_sstamp,
@@ -224,7 +225,7 @@ pub async fn _register(data: JsonUpcase<RegisterData>, mut conn: DbConn) -> Json
         user.private_key = Some(keys.EncryptedPrivateKey);
         user.public_key = Some(keys.PublicKey);
     }
-    
+
     user.uses_key_connector = false;
 
     if CONFIG.mail_enabled() {
@@ -291,7 +292,11 @@ async fn post_set_password(data: JsonUpcase<SetPasswordData>, headers: Headers, 
 }
 
 #[post("/accounts/set-key-connector-key", data = "<data>")]
-async fn post_set_key_connector_key(data: JsonUpcase<SetKeyConnectorData>, headers: Headers, mut conn: DbConn) -> JsonResult {
+async fn post_set_key_connector_key(
+    data: JsonUpcase<SetKeyConnectorData>,
+    headers: Headers,
+    mut conn: DbConn,
+) -> JsonResult {
     let data: SetKeyConnectorData = data.into_inner().data;
     let mut user = headers.user;
 
@@ -302,7 +307,7 @@ async fn post_set_key_connector_key(data: JsonUpcase<SetKeyConnectorData>, heade
     if let Some(client_kdf_type) = data.Kdf {
         user.client_kdf_type = client_kdf_type;
     }
-    
+
     user.akey = data.Key;
     user.uses_key_connector = true;
 
@@ -311,11 +316,39 @@ async fn post_set_key_connector_key(data: JsonUpcase<SetKeyConnectorData>, heade
         user.public_key = Some(keys.PublicKey);
     }
 
-    log_user_event(EventType::UserMigratedKeyToKeyConnector as i32, &user.uuid, headers.device.atype, &headers.ip.ip, &mut conn).await;
+    log_user_event(
+        EventType::UserMigratedKeyToKeyConnector as i32,
+        &user.uuid,
+        headers.device.atype,
+        &headers.ip.ip,
+        &mut conn,
+    )
+    .await;
 
     user.save(&mut conn).await?;
     Ok(Json(json!({
       "Object": "set-key-connector-key",
+    })))
+}
+
+#[post("/accounts/convert-to-key-connector")]
+async fn post_convert_to_keyconnector(headers: Headers, mut conn: DbConn) -> JsonResult {
+    let mut user = headers.user;
+
+    user.uses_key_connector = true;
+
+    log_user_event(
+        EventType::UserMigratedKeyToKeyConnector as i32,
+        &user.uuid,
+        headers.device.atype,
+        &headers.ip.ip,
+        &mut conn,
+    )
+    .await;
+
+    user.save(&mut conn).await?;
+    Ok(Json(json!({
+      "Object": "convert-to-key-connector",
     })))
 }
 

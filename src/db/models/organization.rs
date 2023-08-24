@@ -167,7 +167,7 @@ impl Organization {
             "UsePolicies": true,
             // "UseScim": false, // Not supported (Not AGPLv3 Licensed)
             "UseSso": CONFIG.sso_enabled(),
-            "UseKeyConnector": CONFIG.sso_keyconnector_enabled(), 
+            "UseKeyConnector": CONFIG.sso_keyconnector_enabled(),
             "SelfHost": true,
             "UseApi": true,
             "HasPublicAndPrivateKeys": self.private_key.is_some() && self.public_key.is_some(),
@@ -360,7 +360,7 @@ impl UserOrganization {
             "ProviderName": null,
             "KeyConnectorEnabled": CONFIG.sso_keyconnector_enabled(),
             "KeyConnectorUrl": CONFIG.sso_keyconnectorurl(),
-            
+
             // TODO: Add support for Custom User Roles
             // See: https://bitwarden.com/help/article/user-types-access-control/#custom-role
             // "Permissions": {

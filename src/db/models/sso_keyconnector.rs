@@ -1,7 +1,7 @@
+use super::User;
 use crate::api::EmptyResult;
 use crate::db::DbConn;
 use crate::error::MapResult;
-use super::User;
 
 db_object! {
     #[derive(Identifiable, Queryable, Insertable, Associations, AsChangeset)]
@@ -23,7 +23,7 @@ impl SsoKeyConnector {
             user_uuid,
             secretkey: String::new(),
         }
-    }  
+    }
 }
 
 /// Database methods

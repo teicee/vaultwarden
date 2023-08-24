@@ -48,7 +48,7 @@ pub enum EventType {
     UserFailedLogIn2fa = 1006,
     UserClientExportedVault = 1007,
     // UserUpdatedTempPassword = 1008, // Not supported
-    UserMigratedKeyToKeyConnector = 1009, 
+    UserMigratedKeyToKeyConnector = 1009,
 
     // Cipher
     CipherCreated = 1100,

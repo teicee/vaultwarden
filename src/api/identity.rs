@@ -179,7 +179,7 @@ async fn _authorization_login(
     // let expiry = token.exp;
     let nonce = token.nonce;
     let mut new_user = false;
-    let mut sso_keyconnector_key = "".to_string();
+    let mut sso_keyconnector_key = String::new();
 
     match SsoNonce::find(&nonce, conn).await {
         Some(sso_nonce) => {
@@ -270,7 +270,7 @@ async fn _authorization_login(
                                 sso_keyconnector_key = keyconnector.secretkey;
                             }
                             None => {
-                                sso_keyconnector_key = "".to_string();
+                                sso_keyconnector_key = String::new();
                             }
                         };
                     }

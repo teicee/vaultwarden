@@ -883,6 +883,22 @@ async fn send_invite(
         err!("Only Owners can invite Managers, Admins or Owners")
     }
 
+    match CONFIG.users_limit() {
+        None => {}
+        Some(limit) => {
+            let current_number = User::get_all(&mut conn).await.len();
+            let invited_number = data.Emails.len();
+            if current_number >= limit {
+                err!(format!("User limit reached: {limit}"))
+            }
+            if current_number + invited_number > limit {
+                err!(format!(
+                    "Invited users will reach user limit of {limit} while you have already {current_number} users"
+                ))
+            }
+        }
+    };
+
     for email in data.Emails.iter() {
         let email = email.to_lowercase();
         let mut user_org_status = UserOrgStatus::Invited as i32;

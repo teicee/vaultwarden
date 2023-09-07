@@ -169,6 +169,15 @@ pub async fn _register(data: JsonUpcase<RegisterData>, mut conn: DbConn) -> Json
         }
     };
 
+    match CONFIG.users_limit() {
+        None => {}
+        Some(limit) => {
+            if User::get_all(&mut conn).await.len() >= limit {
+                err!(format!("User limit reached: {limit}"))
+            }
+        }
+    };
+
     // Make sure we don't leave a lingering invitation.
     Invitation::take(&email, &mut conn).await;
 

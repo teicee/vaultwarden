@@ -498,6 +498,10 @@ make_config! {
 
         /// Events days retain |> Number of days to retain events stored in the database. If unset, events are kept indefinitely.
         events_days_retain:     i64,    false,   option;
+
+        /// Users limit |> Defines how many users are allowed to create an account. If unset, there is no limit.
+        users_limit:   usize,    false,  option;
+
     },
 
     /// Advanced settings

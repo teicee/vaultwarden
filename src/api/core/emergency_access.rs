@@ -223,6 +223,15 @@ async fn send_invite(data: JsonUpcase<EmergencyAccessInviteData>, headers: Heade
         err!(format!("Grantee user already invited: {}", &grantee_user.email))
     }
 
+    match CONFIG.users_limit() {
+        None => {}
+        Some(limit) => {
+            if User::get_all(&mut conn).await.len() >= limit {
+                err!(format!("User limit reached: {limit}"))
+            }
+        }
+    };
+
     let mut new_emergency_access =
         EmergencyAccess::new(grantor_user.uuid, grantee_user.email, emergency_access_status, new_type, wait_time_days);
     new_emergency_access.save(&mut conn).await?;
